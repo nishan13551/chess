@@ -1,0 +1,12 @@
+# chess.ferdousnishan.com — a personal project, deliberately kept out of search.
+#
+# IMPORTANT: crawling is allowed on purpose. Do NOT add "Disallow: /" here.
+# Blocking the crawl would stop Google reading the noindex rules in index.html
+# and the X-Robots-Tag header, and it could then list the bare URL with no
+# description instead of dropping it. Allowing the fetch is what gets the page
+# removed from the index.
+
+User-agent: *
+Allow: /
+
+# No sitemap on purpose: nothing here should be submitted for indexing.
