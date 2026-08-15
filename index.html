@@ -489,7 +489,6 @@ button.who:hover{border-color:var(--ac);opacity:1}
       <button class="btn on" id="soundBtn">Sound on</button>
       <button class="btn on" id="voiceBtn">Coach voice on</button>
       <label class="volWrap" title="Volume">🔈<input type="range" id="vol" min="0" max="100" value="90"><span id="volNum">90</span></label>
-      <select class="btn" id="voiceSel" title="Which installed voice the coach speaks with"></select>
     </div>
   </header>
 
@@ -511,6 +510,8 @@ button.who:hover{border-color:var(--ac);opacity:1}
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <b id="who" style="font-size:15px">guest</b>
           <button class="btn mini" id="whoChange">Change</button>
+          <button class="btn mini" id="syncOut" title="Copy a code carrying this profile to another device">Copy sync code</button>
+          <button class="btn mini" id="syncIn" title="Paste a sync code from another device">Paste code</button>
         </div>
         <div id="whoStats" style="font-size:11.5px;opacity:.6;margin-top:6px"></div>
         <div id="whoOthers" style="font-size:11px;opacity:.6;margin-top:6px"></div>
@@ -523,7 +524,10 @@ button.who:hover{border-color:var(--ac);opacity:1}
           <label>Board<select id="boardSel"></select></label>
           <label>Background<select id="backSel"></select></label>
           <label>Pieces<select id="pieceSel"></select></label>
+          <label>Sounds<select id="soundSel"></select></label>
+          <label>Coach voice<select id="voiceSel"></select></label>
         </div>
+        <div id="voiceNote2" style="font-size:11px;opacity:.5;margin-top:6px"></div>
         <div class="row" style="margin-top:9px">
           <button class="btn mini" id="lookRandom">Surprise me</button>
           <button class="btn mini" id="lookReset">Reset</button>
@@ -681,21 +685,53 @@ const Snd = (() => {
   }
   const now = () => boot().currentTime;
 
-  /* the wooden thock: sharp filtered-noise attack + three decaying body tones */
+  /* Sound sets. Each is a different physical object hitting a board: how sharp
+     the initial transient is, how bright, how fast it dies, and which body
+     resonances ring underneath. "Crisp Click" is the default because a short,
+     bright transient reads as precise; long low tails read as soft. */
+  const SOUNDSETS = [
+    { n:'Crisp Click', hp:520, bright:2.5, decay:.028, click:1.05, checkHz:73, checkBright:1.5,
+      body:[[240,.55,.040],[520,.30,.026]] },
+    { n:'Classic Wood', hp:240, bright:1.55, decay:.052, click:.5, checkHz:58, checkBright:1,
+      body:[[168,.95,.088],[262,.55,.062],[437,.24,.042]] },
+    { n:'Marble', hp:820, bright:3.1, decay:.034, click:.95, checkHz:87, checkBright:1.9,
+      body:[[330,.5,.046],[660,.3,.03],[1180,.14,.018]] },
+    { n:'Sharp Tap', hp:1150, bright:3.9, decay:.020, click:1.25, checkHz:98, checkBright:2.3,
+      body:[[280,.4,.026]] },
+    { n:'Soft Felt', hp:150, bright:.85, decay:.078, click:.2, checkHz:49, checkBright:.7,
+      body:[[120,.9,.115],[190,.4,.08]] }
+  ];
+  let setIdx = 0;
+  const kit = () => SOUNDSETS[setIdx] || SOUNDSETS[0];
+
+  /* the strike: a click transient, a filtered noise burst, then body resonance */
   function thock(t, {gain=1, pitch=1, bright=1} = {}){
-    const c = boot();
+    const c = boot(), k = kit();
+    // the click itself — a couple of milliseconds of very short, very bright noise
+    if(k.click > 0){
+      const cs = c.createBufferSource();
+      cs.buffer = noise; cs.playbackRate.value = 2.4;
+      const chp = c.createBiquadFilter(); chp.type='highpass'; chp.frequency.value = 2600;
+      const cg = c.createGain();
+      cg.gain.setValueAtTime(.0001, t);
+      cg.gain.linearRampToValueAtTime(.24 * k.click * gain, t + .0006);
+      cg.gain.exponentialRampToValueAtTime(.0004, t + .010);
+      cs.connect(chp); chp.connect(cg); cg.connect(master);
+      cs.start(t); cs.stop(t + .02);
+    }
     const src = c.createBufferSource();
     src.buffer = noise; src.playbackRate.value = .8 + Math.random()*.45;
-    const hp = c.createBiquadFilter(); hp.type='highpass'; hp.frequency.value = 240;
-    const bp = c.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value = 1580*bright; bp.Q.value = 1.05;
+    const hp = c.createBiquadFilter(); hp.type='highpass'; hp.frequency.value = k.hp;
+    const bp = c.createBiquadFilter(); bp.type='bandpass';
+    bp.frequency.value = 1580 * k.bright * bright; bp.Q.value = 1.05;
     const g = c.createGain();
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.linearRampToValueAtTime(.5*gain, t+.0018);
-    g.gain.exponentialRampToValueAtTime(.0006, t+.052);
+    g.gain.linearRampToValueAtTime(.5*gain, t+.0016);
+    g.gain.exponentialRampToValueAtTime(.0006, t + k.decay);
     src.connect(hp); hp.connect(bp); bp.connect(g); g.connect(master);
     src.start(t); src.stop(t+.1);
 
-    [[168,.95,.088],[262,.55,.062],[437,.24,.042]].forEach(([f,a,d])=>{
+    k.body.forEach(([f,a,d])=>{
       const o = c.createOscillator(); o.type='sine';
       o.frequency.setValueAtTime(f*pitch, t);
       o.frequency.exponentialRampToValueAtTime(f*pitch*.83, t+d);
@@ -749,12 +785,16 @@ const Snd = (() => {
     castle(){ if(!enabled) return; const t = now(); thock(t,{gain:.85}); thock(t+.135,{gain:1,pitch:.93}); },
 
     /* low detuned cluster under a closing filter — menacing, not cute */
+    setSet(i){ setIdx = Math.max(0, Math.min(SOUNDSETS.length - 1, i|0)); },
+    getSet(){ return setIdx; },
+    sets(){ return SOUNDSETS.map(s => s.n); },
     check(){
       if(!enabled) return;
-      const c = boot(), t = c.currentTime;
+      const c = boot(), t = c.currentTime, k = kit();
+      thock(t, {gain:.5, pitch:1.4, bright:1.6});          // a sharp rap so the warning cuts through
       const lp = c.createBiquadFilter(); lp.type='lowpass'; lp.Q.value = 5.5;
-      lp.frequency.setValueAtTime(1200, t);
-      lp.frequency.exponentialRampToValueAtTime(210, t+.72);
+      lp.frequency.setValueAtTime(1200 * k.checkBright, t);
+      lp.frequency.exponentialRampToValueAtTime(210 * k.checkBright, t+.72);
       const g = c.createGain();
       g.gain.setValueAtTime(.0001, t);
       g.gain.linearRampToValueAtTime(.30, t+.035);
@@ -764,13 +804,13 @@ const Snd = (() => {
       const lfo = c.createOscillator(), lg = c.createGain();
       lfo.frequency.value = 7.5; lg.gain.value = .10;
       lfo.connect(lg); lg.connect(g.gain); lfo.start(t); lfo.stop(t+1.2);
-      [[58.27,'sawtooth',.5],[61.74,'sawtooth',.44],[116.5,'triangle',.26],[164.8,'sine',.14]]
+      const base = k.checkHz;
+      [[base,'sawtooth',.5],[base*1.06,'sawtooth',.44],[base*2,'triangle',.26],[base*2.83,'sine',.14]]
       .forEach(([f,type,a])=>{
         const o = c.createOscillator(); o.type = type; o.frequency.value = f;
         const og = c.createGain(); og.gain.value = a;
         o.connect(og); og.connect(lp); o.start(t); o.stop(t+1.2);
       });
-      thock(t, {gain:.65, pitch:.8});
     },
 
     mate(win){
@@ -890,13 +930,65 @@ const Coach = (() => {
     const list = englishVoices();
     if(list.length){ ready = true; if(!voice) voice = preferred(); fillPicker(); }
   }
+  /* Rank the installed voices and keep only the best handful. A long raw list of
+     every system voice is unusable, especially on a phone. */
+  function score(v){
+    const n = v.name;
+    let s = 0;
+    if(/natural/i.test(n)) s += 100;
+    if(/online/i.test(n)) s += 90;
+    if(/neural/i.test(n)) s += 90;
+    if(/google/i.test(n)) s += 60;
+    if(/(aria|guy|jenny|ryan|libby|sonia|emma|brian|christopher|michelle)/i.test(n)) s += 40;
+    if(/(samantha|daniel|karen|moira|tessa|serena)/i.test(n)) s += 35;   // Apple voices
+    if(/(mark|david|zira|hazel|george|susan)/i.test(n)) s += 10;         // older SAPI
+    if(/^en-GB/i.test(v.lang)) s += 4;
+    if(/^en-US/i.test(v.lang)) s += 3;
+    return s;
+  }
+  function prettyName(v){
+    let n = v.name
+      .replace(/^(Microsoft|Google|Apple)\s+/i, '')
+      .replace(/\s*\((Natural|Online|Enhanced|Premium)\)\s*/ig, ' ')
+      .replace(/\s*-\s*English.*$/i, '')
+      .replace(/\s*English\s*\(.*\)$/i, '')
+      .trim();
+    const tags = [];
+    if(/natural|online|neural/i.test(v.name)) tags.push('natural');
+    else tags.push('basic');
+    if(/en-GB/i.test(v.lang)) tags.push('UK');
+    else if(/en-AU/i.test(v.lang)) tags.push('AU');
+    else if(/en-IN/i.test(v.lang)) tags.push('IN');
+    return `${n} · ${tags.join(', ')}`;
+  }
+  /* The five on offer, best first, no duplicates. */
+  function shortlist(){
+    const seen = new Set(), out = [];
+    englishVoices()
+      .slice()
+      .sort((a,b) => score(b) - score(a) || a.name.localeCompare(b.name))
+      .forEach(v => {
+        const key = prettyName(v).toLowerCase();
+        if(seen.has(key)) return;
+        seen.add(key);
+        out.push(v);
+      });
+    return out.slice(0, 5);
+  }
   function fillPicker(){
     const sel = document.getElementById('voiceSel');
     if(!sel) return;
-    const list = englishVoices();
-    sel.innerHTML = list.map((v,i) =>
-      `<option value="${i}"${voice && v.name===voice.name ? ' selected':''}>${v.name.replace(/Microsoft |Google /,'')}</option>`).join('');
+    const list = shortlist();
+    sel.innerHTML = list.length
+      ? list.map((v,i) => `<option value="${i}"${voice && v.name===voice.name ? ' selected':''}>${prettyName(v)}</option>`).join('')
+      : '<option>No voices installed</option>';
     sel.disabled = !list.length;
+    const note = document.getElementById('voiceNote2');
+    if(note) note.textContent = list.length
+      ? (list.some(v => /natural|online|neural/i.test(v.name))
+          ? `${list.length} voices available.`
+          : `${list.length} voices, all basic — see Settings for how to add a natural one.`)
+      : 'No speech voices are installed in this browser.';
   }
   if(synth){
     synth.addEventListener ? synth.addEventListener('voiceschanged', init) : (synth.onvoiceschanged = init);
@@ -908,8 +1000,9 @@ const Coach = (() => {
     isOn: () => on,
     setOn(v){ on = v; if(!v){ stopClip(); if(synth) synth.cancel(); } },
     voices: englishVoices,
-    pick(i){ const list = englishVoices(); if(list[i]) voice = list[i]; },
+    pick(i){ const list = shortlist(); if(list[i]) voice = list[i]; },
     currentName(){ return voice ? voice.name : ''; },
+    shortlist,
     /* Restore by name, retrying while the voice list is still populating. */
     pickByName(name){
       if(!name) return false;
@@ -919,7 +1012,7 @@ const Coach = (() => {
           voice = hit;
           fillPicker();
           const sel = document.getElementById('voiceSel');
-          if(sel){ const i = englishVoices().findIndex(v => v.name === name); if(i >= 0) sel.value = i; }
+          if(sel){ const i = shortlist().findIndex(v => v.name === name); if(i >= 0) sel.value = i; }
           return true;
         }
         return false;
@@ -2083,6 +2176,79 @@ function nameGain(cp){
   if(cp >= 150) return 'material';
   return 'a pawn';
 }
+/* What does a move actually DO? Read off the position rather than guessing, so
+   the coach can name the idea: a fork, a free piece, an open file, a check. */
+const PIECE_WORD = { P:'pawn', N:'knight', B:'bishop', R:'rook', Q:'queen', K:'king' };
+function moveIdea(state, mv){
+  const s = clone(state);
+  const m = legalMoves(s).find(x => uci(x) === mv);
+  if(!m) return '';
+  const me = colorOf(m.p), them = other(me);
+  const mover = PIECE_WORD[m.p.toUpperCase()];
+  const wasAttacked = isAttacked(s, m.f, them);          // were we rescuing it?
+  const grabbed = m.c !== '' ? PIECE_WORD[m.c.toUpperCase()] : null;
+  const defendersOfTarget = m.c !== '' ? isAttacked(s, m.t, them) : false;
+  makeMove(s, m);
+  const chk = inCheck(s, s.turn);
+  const mate = chk && legalMoves(s).length === 0;
+  // does the piece now hit two valuable things?
+  let hits = 0, hitsKing = false;
+  const dirsFrom = sq => {
+    const out = [];
+    for(let i = 0; i < 64; i++){
+      const q = s.b[i];
+      if(q === '' || colorOf(q) === me) continue;
+      if(isAttackedFromSquare(s, sq, i)) out.push(q);
+    }
+    return out;
+  };
+  const targets = dirsFrom(m.t);
+  targets.forEach(q => {
+    if(q.toUpperCase() === 'K') hitsKing = true;
+    else if(VAL[q.toUpperCase()] >= 300) hits++;
+  });
+  const openFile = m.p.toUpperCase() === 'R' && (() => {
+    const f = colOf(m.t);
+    for(let r = 0; r < 8; r++){ const q = s.b[r*8+f]; if(q !== '' && q.toUpperCase() === 'P') return false; }
+    return true;
+  })();
+  undoMove(s, m);
+
+  if(mate) return 'it is mate';
+  if(hitsKing && hits >= 1) return `it forks the king and a ${PIECE_WORD[targets.find(q => q.toUpperCase() !== 'K' && VAL[q.toUpperCase()] >= 300).toUpperCase()]}`;
+  if(hits >= 2) return 'it attacks two pieces at once';
+  if(grabbed && !defendersOfTarget) return `it takes a free ${grabbed}`;
+  if(grabbed) return `it takes the ${grabbed}`;
+  if(m.cs) return 'it castles the king into safety';
+  if(wasAttacked) return `it saves the ${mover}`;
+  if(openFile) return 'it puts the rook on an open file';
+  if(chk) return 'it comes with check';
+  if(m.pr) return 'it promotes';
+  return '';
+}
+/* Is square `to` attacked by whatever stands on `from`? */
+function isAttackedFromSquare(s, from, to){
+  const p = s.b[from];
+  if(p === '') return false;
+  const t = p.toUpperCase(), fr = rowOf(from), fc = colOf(from), tr = rowOf(to), tc = colOf(to);
+  const dr = tr - fr, dc = tc - fc;
+  if(t === 'N') return (Math.abs(dr) === 1 && Math.abs(dc) === 2) || (Math.abs(dr) === 2 && Math.abs(dc) === 1);
+  if(t === 'K') return Math.abs(dr) <= 1 && Math.abs(dc) <= 1 && (dr || dc);
+  if(t === 'P'){ const d = colorOf(p) === 'w' ? -1 : 1; return dr === d && Math.abs(dc) === 1; }
+  const straight = (dr === 0 || dc === 0), diag = Math.abs(dr) === Math.abs(dc);
+  if(t === 'R' && !straight) return false;
+  if(t === 'B' && !diag) return false;
+  if(t === 'Q' && !straight && !diag) return false;
+  if(!straight && !diag) return false;
+  const sr = Math.sign(dr), sc = Math.sign(dc);
+  let r = fr + sr, c = fc + sc;
+  while(r !== tr || c !== tc){
+    if(s.b[r*8+c] !== '') return false;
+    r += sr; c += sc;
+  }
+  return true;
+}
+
 async function comparativeAdvice(before, playedUci, g){
   if(!g || !g.best || g.best === playedUci) return '';
   let allows = '', achieves = '';
@@ -2111,7 +2277,12 @@ async function comparativeAdvice(before, playedUci, g){
           }
         }
         undoMove(sB, reps[0].m);
-        if(gain >= 90) achieves = `${g.bestSan} would have won ${nameGain(gain)}.`;
+        const idea = moveIdea(before, g.best);
+        // do not say "wins the queen — it takes a free queen"; only add the idea
+        // when it tells you something the material count did not
+        const extra = idea && !/^it takes/.test(idea) ? ' — ' + idea : '';
+        if(gain >= 90) achieves = `${g.bestSan} would have won ${nameGain(gain)}${extra}.`;
+        else if(idea) achieves = `${g.bestSan} was the move: ${idea}.`;
         else if(g.epBest - g.epPlayed >= 0.12) achieves = `${g.bestSan} was much stronger.`;
       }
     }
@@ -2464,6 +2635,11 @@ function applyLook(){
   sel('boardSel', BOARDS, G.board);
   sel('backSel', BACKDROPS, G.backdrop);
   sel('pieceSel', PIECESETS, G.pieceSet);
+  const ss = $('soundSel');
+  if(ss && ss.options.length !== Snd.sets().length){
+    ss.innerHTML = Snd.sets().map((n,i) => `<option value="${i}">${n}</option>`).join('');
+  }
+  if(ss) ss.value = Snd.getSet();
   if(G.s) render();
 }
 // kept for older calls: treat a single index as the board choice
@@ -3581,6 +3757,7 @@ $('lookReset').onclick  = () => { G.board = 0; G.backdrop = 0; G.pieceSet = 0; a
 $('boardSel').onchange = e => { G.board = +e.target.value; applyLook(); save(); };
 $('backSel').onchange  = e => { G.backdrop = +e.target.value; applyLook(); save(); };
 $('pieceSel').onchange = e => { G.pieceSet = +e.target.value; applyLook(); save(); Snd.pick(); };
+$('soundSel').onchange = e => { Snd.unlock(); Snd.setSet(+e.target.value); save(); Snd.move(); };
 $('soundBtn').onclick = () => {
   const on = !Snd.isEnabled();
   Snd.setEnabled(on);
@@ -3654,7 +3831,7 @@ function save(){
       l:G.level, s:Snd.isEnabled(), v:Coach.isOn(),
       // by NAME, not by list position: the voice list loads asynchronously and
       // can come back in a different order, which used to restore the wrong voice
-      vn: Coach.currentName(),
+      vn: Coach.currentName(), snd: Snd.getSet(),
       ps:[...G.pSolved], ld:[...G.lDone], pi:G.pIdx, pu:G.pUnlocked, games:G.games.slice(0, 60),
       vol: Math.round(Snd.getVolume() * 100)
     }));
@@ -3675,6 +3852,7 @@ function applyProfile(v){
   if(typeof v.pu === 'number') G.pUnlocked = Math.max(0, Math.min(v.pu, PUZZLES.length - 1));
   if(v.pu === undefined && G.pSolved.size) G.pUnlocked = Math.min(Math.max(...G.pSolved) + 1, PUZZLES.length - 1);
   if(!isUnlocked(G.pIdx)) G.pIdx = firstUnsolved();
+  if(typeof v.snd === 'number') Snd.setSet(v.snd);
   if(typeof v.vol === 'number'){
     Snd.setVolume(v.vol / 100);
     Coach.setVolume(v.vol / 100);        // the coach follows the same slider
@@ -3834,6 +4012,44 @@ $('toolsToggle').onclick = () => {
   $('toolsToggle').textContent = open ? '⚙ Hide settings' : '⚙ Settings';
 };
 $('backLive').onclick = backToLive;
+/* --- moving a profile between devices ---------------------------------------
+   Everything is stored in this browser, so a username on your phone and the
+   same username on your laptop are two separate profiles. This code carries
+   one across: copy it on one device, paste it on the other. */
+function profilePayload(){
+  let raw = '{}';
+  try { raw = localStorage.getItem(keyFor(G.user)) || '{}'; } catch(e){}
+  return btoa(unescape(encodeURIComponent(JSON.stringify({ u: G.user, d: JSON.parse(raw) }))));
+}
+$('syncOut').onclick = async () => {
+  save();
+  const code = profilePayload();
+  try {
+    await navigator.clipboard.writeText(code);
+    toast('Sync code copied — paste it on your other device');
+  } catch(e){
+    prompt('Copy this code and paste it on your other device:', code);
+  }
+};
+$('syncIn').onclick = () => {
+  const code = prompt('Paste the sync code from your other device:');
+  if(!code) return;
+  try {
+    const parsed = JSON.parse(decodeURIComponent(escape(atob(code.trim()))));
+    if(!parsed || !parsed.u || !parsed.d) throw new Error('not a sync code');
+    G.user = String(parsed.u).slice(0, 20) || 'guest';
+    try { localStorage.setItem(keyFor(G.user), JSON.stringify(parsed.d)); } catch(e){}
+    rememberUser(G.user);
+    applyProfile(parsed.d);
+    applyLook();
+    document.querySelectorAll('[data-lvl]').forEach(x => x.classList.toggle('on', +x.dataset.lvl === G.level));
+    renderProfile(); renderLessonList(); renderHistory();
+    if(G.mode === 'puzzle') loadPuzzle(firstUnsolved()); else if(G.mode === 'play') newGame();
+    toast(`Restored ${G.user}: ${G.pSolved.size} puzzles, ${G.games.length} games`);
+  } catch(e){
+    toast('That does not look like a sync code.');
+  }
+};
 $('whoChange').onclick = () => {
   const name = prompt('Player name (no password — progress is saved under this name):', G.user);
   if(name === null) return;
