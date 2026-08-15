@@ -1,7 +1,7 @@
 <#
   make-voice.ps1 — turns voice-script.json into one mp3 per line for Magnus.
 
-  1. Open chess.html, go to the Learn tab, press "Export script".
+  1. Open index.html, go to the Learn tab, press "Export script".
      Move the downloaded voice-script.json next to this file.
   2. Pick the voice you want on elevenlabs.io and copy its Voice ID
      (Voices -> your voice -> ID). Use a voice you own or a stock/designed
@@ -9,7 +9,7 @@
   3. Run:
        .\make-voice.ps1 -ApiKey "sk_..." -VoiceId "abcdef123456"
 
-  Files land in .\voice\<id>.mp3, which is exactly where chess.html looks.
+  Files land in .\voice\<id>.mp3, which is exactly where index.html looks.
   Re-running skips lines that already exist, so it is safe to stop and resume,
   and after editing one lesson you can delete that clip and rerun.
 #>
@@ -31,7 +31,7 @@ $ErrorActionPreference = "Stop"
 
 if (-not (Test-Path $ScriptPath)) {
   Write-Host "Cannot find $ScriptPath." -ForegroundColor Red
-  Write-Host 'Open chess.html -> Learn tab -> "Export script", then move the file here.'
+  Write-Host 'Open index.html -> Learn tab -> "Export script", then move the file here.'
   exit 1
 }
 
@@ -116,5 +116,5 @@ if ($failed.Count -gt 0) {
   Write-Host ($failed -join ", ")
   Write-Host "Re-run the same command to retry just those."
 } else {
-  Write-Host "Done. Reload chess.html and Magnus will speak with the clips." -ForegroundColor Green
+  Write-Host "Done. Reload index.html and Magnus will speak with the clips." -ForegroundColor Green
 }
