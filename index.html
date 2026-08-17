@@ -74,6 +74,14 @@ main{display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap}
    and pushes a horizontal scrollbar onto the page. */
 .boardArea{flex:0 0 auto;width:calc(var(--sq)*8 + var(--edge)*2);max-width:100%;min-width:0}
 .status,#resultBanner,#browseBar{max-width:100%}
+/* captured pieces, one tray per player, above and below the board */
+.tray{display:flex;align-items:center;gap:1px;min-height:22px;padding:2px 3px;
+  font-size:calc(var(--sq)*.34);line-height:1;flex-wrap:wrap}
+.tray .gone{opacity:.75;filter:grayscale(.15)}
+.tray .gone.w{color:var(--wf,#fcfcfa);text-shadow:0 0 2px rgba(0,0,0,.7)}
+.tray .gone.b{color:var(--bf,#1b1a18);text-shadow:0 0 2px rgba(255,255,255,.45)}
+.tray .edge{margin-left:6px;font-size:11.5px;font-weight:700;opacity:.75;
+  font-family:"Inter","Segoe UI",system-ui,sans-serif}
 
 /* The badge sits on its own layer over the board, because redrawing the board
    replaces its contents and would otherwise wipe the badge away. */
@@ -494,7 +502,9 @@ button.who:hover{border-color:var(--ac);opacity:1}
 
   <main>
     <section class="boardArea">
+      <div class="tray" id="trayTop"></div>
       <div class="boardBox"><div class="board" id="board"></div><div id="badgeLayer"></div></div>
+      <div class="tray" id="trayBottom"></div>
       <div class="status" id="status"></div>
       <div id="resultBanner"></div>
       <div id="browseBar" hidden style="margin-top:8px">
@@ -607,7 +617,8 @@ button.who:hover{border-color:var(--ac);opacity:1}
           <div class="levelGrid" id="pGrid"></div>
           <div class="mat" style="margin-top:8px"><span id="pProgress"></span><span id="pBand"></span></div>
           <div style="font-size:11px;opacity:.5;margin-top:6px;line-height:1.5">
-            Solve one to unlock the next. Anything you have solved stays open, so you can replay it whenever you like.
+            All 123 are open — they run easiest first, so going in order gets steadily harder.
+            Green means solved.
           </div>
         </div>
         <div class="card">
@@ -1127,7 +1138,54 @@ function toFEN(s){
   return rows.join('/') + ' ' + s.turn + ' ' + (s.cr || '-') + ' ' +
          (s.ep >= 0 ? toAlg(s.ep) : '-') + ' ' + s.hm + ' ' + s.fm;
 }
+/* Cheap key for the evaluation cache — not used for repetition. */
 const posKey = s => s.b.join('') + s.turn + s.cr + s.ep;
+
+/* Repetition key. Two positions repeat only when the pieces, the side to move,
+   the castling rights AND the en-passant possibilities all match. The last one
+   is subtle: a double pawn push always sets an ep square, but the position only
+   differs from an otherwise identical one if a pawn can actually make that
+   capture legally. Recording the raw square would under-count repetitions. */
+function repetitionKey(s){
+  let ep = '-';
+  if(s.ep >= 0){
+    const mover = s.turn === 'w' ? 'P' : 'p';
+    const r = rowOf(s.ep) + (s.turn === 'w' ? 1 : -1), c = colOf(s.ep);
+    let adjacent = false;
+    if(r >= 0 && r < 8){
+      for(const dc of [-1, 1]){
+        const nc = c + dc;
+        if(nc >= 0 && nc < 8 && s.b[sqi(r, nc)] === mover){ adjacent = true; break; }
+      }
+    }
+    // and it must be legal: an ep capture that exposes your own king does not count
+    if(adjacent && legalMoves(s).some(m => m.ep && m.t === s.ep)) ep = toAlg(s.ep);
+  }
+  return s.b.join('') + ' ' + s.turn + ' ' + (s.cr || '-') + ' ' + ep;
+}
+
+/* Can either side still deliver mate? Careful: fewer pieces is not the test —
+   a lone pawn or rook is enough, while two knights are not (chess.com treats
+   K+NN v K as dead). */
+function deadPosition(s){
+  const men = [];
+  for(let i = 0; i < 64; i++){
+    const p = s.b[i];
+    if(p === '' || p.toUpperCase() === 'K') continue;
+    men.push({ t: p.toUpperCase(), w: p === p.toUpperCase(), dark: ((rowOf(i) + colOf(i)) % 2) === 1 });
+  }
+  // anything that can force mate on its own keeps the game alive
+  if(men.some(m => m.t === 'P' || m.t === 'R' || m.t === 'Q')) return false;
+  const w = men.filter(m => m.w), b = men.filter(m => !m.w);
+  if(!men.length) return true;                                   // K v K
+  if(men.length === 1) return true;                              // K+B or K+N v K
+  // two knights alone cannot force mate
+  if(w.length === 2 && !b.length && w.every(m => m.t === 'N')) return true;
+  if(b.length === 2 && !w.length && b.every(m => m.t === 'N')) return true;
+  // any number of bishops, all on one colour complex, can never mate
+  if(men.every(m => m.t === 'B') && men.every(m => m.dark === men[0].dark)) return true;
+  return false;
+}
 const clone  = s => ({ b: s.b.slice(), turn: s.turn, cr: s.cr, ep: s.ep, hm: s.hm, fm: s.fm });
 
 function mk(s, f, t, extra){
@@ -2549,7 +2607,9 @@ const LESSONS = [
    ========================================================================== */
 /* Three independent axes: the squares, the page around them, and the pieces.
    Any combination works, and each is remembered per player. */
+/* index 0 is the default a new player sees: the familiar green and cream */
 const BOARDS = [
+  { n:'Green & Cream', l:'#eeeed2', d:'#769656' },
   { n:'Ink & Paper',   l:'#f6f6f4', d:'#232323' },
   { n:'Classic Wood',  l:'#f0d9b5', d:'#b58863' },
   { n:'Emerald Club',  l:'#eeeed2', d:'#769656' },
@@ -2720,6 +2780,7 @@ function render(){
     }
   }
   b.innerHTML = html;
+  renderTrays();
   // one-shot effects: they have been painted, so they must not repeat next render
   G.anim = null; G.captureFx = null; G.judgeFx = null; G.nopeSq = null; G.yepSq = null;
 }
@@ -2735,17 +2796,42 @@ function shake(){
 }
 
 /* --- status / lists ---------------------------------------------------- */
+/* Every way a game can end, and the words for it. */
+const RESULT_TEXT = {
+  mate:        loser => `Checkmate — ${loser === 'w' ? 'Black' : 'White'} wins`,
+  stalemate:   () => 'Draw by stalemate',
+  material:    () => 'Draw by insufficient material',
+  repetition:  () => 'Draw by threefold repetition',
+  fivefold:    () => 'Draw by fivefold repetition',
+  fifty:       () => 'Draw by the 50-move rule',
+  seventyfive: () => 'Draw by the 75-move rule'
+};
+
+/* Checked in a fixed order after every move. Checkmate is decided first so a
+   mating move can never be overruled by a simultaneous draw condition. */
 function gameResult(){
   const ms = legalMoves(G.s);
-  if(ms.length === 0) return inCheck(G.s, G.s.turn) ? { over:true, type:'mate', loser:G.s.turn } : { over:true, type:'stalemate' };
+  // 1. checkmate  2. stalemate
+  if(ms.length === 0)
+    return inCheck(G.s, G.s.turn)
+      ? { over:true, type:'mate', loser:G.s.turn }
+      : { over:true, type:'stalemate' };
+  // 3. dead position
+  if(deadPosition(G.s)) return { over:true, type:'material' };
+  // 4. repetition — fivefold reported when it somehow gets that far
+  const key = repetitionKey(G.s);
+  const seen = G.keys.filter(k => k === key).length;
+  if(seen >= 5) return { over:true, type:'fivefold', seen };
+  if(seen >= 3) return { over:true, type:'repetition', seen };
+  // 5. move-counter draws. 50 is the one that fires in practice; 75 is the
+  //    FIDE hard stop, kept for completeness.
+  if(G.s.hm >= 150) return { over:true, type:'seventyfive' };
   if(G.s.hm >= 100) return { over:true, type:'fifty' };
-  const key = posKey(G.s);
-  if(G.keys.filter(k => k === key).length >= 3) return { over:true, type:'repetition' };
-  // insufficient material
-  const left = G.s.b.filter(p => p !== '' && p.toUpperCase() !== 'K').map(p => p.toUpperCase());
-  if(left.length === 0 || (left.length === 1 && (left[0] === 'B' || left[0] === 'N')))
-    return { over:true, type:'material' };
   return { over:false };
+}
+function resultText(res){
+  const f = RESULT_TEXT[res.type];
+  return f ? f(res.loser) : 'Game over';
 }
 
 function setStatus(html){ $('status').innerHTML = html; }
@@ -2758,8 +2844,7 @@ function showResult(res, outcome){
   const head = res.type === 'mate' ? 'CHECKMATE' : 'DRAW';
   const line = res.type === 'mate'
     ? (outcome === 'Won' ? 'You win.' : 'The bot wins.')
-    : ({ stalemate:'Stalemate — no legal moves.', fifty:'Fifty-move rule.',
-         repetition:'Threefold repetition.', material:'Not enough material to mate.' }[res.type] || '');
+    : resultText(res) + '.';
   const tint = outcome === 'Won' ? '#6fbf7f' : outcome === 'Lost' ? '#e0603c' : 'var(--ac)';
   el.innerHTML = `<div class="big" style="color:${tint}">${head}${outcome === 'Won' ? ' — YOU WIN' : ''}</div>
                   <div class="sub">${line} Review is below.</div>`;
@@ -2789,12 +2874,11 @@ function updateStatus(){
   if(res.over){
     if(res.type === 'mate'){
       const youWin = res.loser !== G.human;
-      setStatus(`<span class="tag">Game over</span> ${youWin ? "Checkmate — you've won!" : 'Checkmate — the bot got you.'}`);
+      setStatus(`<span class="tag">Game over</span> ${resultText(res)} — ${youWin ? "you've won!" : 'the bot got you.'}`);
       if(youWin && !G.saidWin){ G.saidWin = true; Coach.line("you-won", FIXED_LINES["you-won"]); }
-    } else if(res.type === 'stalemate') setStatus('<span class="tag">Game over</span> Draw by stalemate.');
-    else if(res.type === 'fifty')       setStatus('<span class="tag">Game over</span> Draw by the fifty-move rule.');
-    else if(res.type === 'repetition')  setStatus('<span class="tag">Game over</span> Draw by repetition.');
-    else                                setStatus('<span class="tag">Game over</span> Draw — not enough material.');
+    } else {
+      setStatus(`<span class="tag">Game over</span> ${resultText(res)}.`);
+    }
   } else if(G.busy){
     setStatus(`<span class="tag">${youAre} · vs ${LEVELS[G.level].elo}</span>` +
               `<span class="turn">${LEVELS[G.level].name.split(' · ')[1]} is thinking` +
@@ -2865,6 +2949,41 @@ function backToLive(){
   updateStatus();
 }
 
+/* Who has taken what. Worked out by comparing the pieces still standing with a
+   full set, so promotions (which can leave more queens than you started with)
+   simply clamp at zero rather than showing nonsense. */
+const START_COUNT = { Q:1, R:2, B:2, N:2, P:8 };
+/* Whole points for the tray. The engine values a knight at 3.2 for search
+   accuracy, which would show up here as "+4.8" — not what a player expects. */
+const TRAY_VAL = { Q:9, R:5, B:3, N:3, P:1 };
+function renderTrays(){
+  const top = $('trayTop'), bottom = $('trayBottom');
+  if(!top || !bottom) return;
+  const alive = { w:{Q:0,R:0,B:0,N:0,P:0}, b:{Q:0,R:0,B:0,N:0,P:0} };
+  for(const p of G.s.b){
+    if(p === '' || p.toUpperCase() === 'K') continue;
+    alive[colorOf(p)][p.toUpperCase()]++;
+  }
+  const lost = col => {
+    let html = '', pts = 0;
+    for(const t of ['Q','R','B','N','P']){
+      const n = Math.max(0, START_COUNT[t] - alive[col][t]);
+      pts += n * TRAY_VAL[t];
+      for(let i = 0; i < n; i++) html += `<span class="gone ${col}">${glyphFor(col === 'w' ? t : t.toLowerCase())}</span>`;
+    }
+    return { html, pts };
+  };
+  const w = lost('w'), b = lost('b');          // w = white pieces lost, i.e. taken BY black
+  const edge = b.pts - w.pts;                  // positive: white is ahead
+  const side = who => {
+    const taken = who === 'w' ? b : w;         // what this player has captured
+    const ahead = who === 'w' ? edge : -edge;
+    return taken.html + (ahead > 0 ? `<span class="edge">+${ahead}</span>` : '');
+  };
+  const topPlayer = other(G.orient), bottomPlayer = G.orient;
+  top.innerHTML = side(topPlayer);
+  bottom.innerHTML = side(bottomPlayer);
+}
 function renderMaterial(){
   let d = 0;
   for(const p of G.s.b){
@@ -2899,7 +3018,7 @@ function applyMove(m, silent){
                     glyph: glyphFor(gone), col: colorOf(gone) };
   }
   makeMove(G.s, m);
-  G.keys.push(posKey(G.s));
+  G.keys.push(repetitionKey(G.s));
   const chk = inCheck(G.s, G.s.turn);
   const mate = chk && legalMoves(G.s).length === 0;
   G.sanList.push(san + (mate ? '#' : chk ? '+' : ''));
@@ -3276,7 +3395,7 @@ function botTurn(){
 function newGame(){
   clearTimers();
   G.s = parseFEN(START_FEN);
-  G.hist = []; G.sanList = []; G.keys = [posKey(G.s)];
+  G.hist = []; G.sanList = []; G.keys = [repetitionKey(G.s)];
   G.sel = -1; G.targets = []; G.lastMove = null; G.anim = null; G.over = false; G.busy = false; G.hintSq = null;
   G.saidWin = false; G.uciList = []; G.moveClass = []; G.pendingReview = null; G.recorded = false;
   G.fenList = []; G.browse = null; G.liveState = null; G.liveLast = null;
@@ -3345,7 +3464,7 @@ function loadPuzzle(i){
   G.s = parseFEN(p.fen);
   G.pStep = 0; G.pFailed = false; G.pWrong = 0;
   G.sel = -1; G.targets = []; G.lastMove = null; G.anim = null; G.hintSq = null;
-  G.sanList = []; G.keys = [posKey(G.s)]; G.hist = []; G.busy = false; G.over = false;
+  G.sanList = []; G.keys = [repetitionKey(G.s)]; G.hist = []; G.busy = false; G.over = false;
   G.uciList = []; G.fenList = []; G.moveClass = []; G.browse = null;
   G.orient = G.s.turn;
   clearBadge();
@@ -3487,8 +3606,9 @@ function finishPuzzle(){
   if(more) later(() => { if(G.mode === 'puzzle' && G.over && isUnlocked(next)) loadPuzzle(next); }, 1900);
 }
 
-/* A puzzle is playable once you have reached it, and stays playable once solved. */
-const isUnlocked = i => i <= G.pUnlocked || G.pSolved.has(i);
+/* Every puzzle is open from the start — they are simply ordered easiest first,
+   so working through them in order is still a difficulty ramp. */
+const isUnlocked = () => true;
 function firstUnsolved(){
   for(let i = 0; i < PUZZLES.length; i++) if(!G.pSolved.has(i) && isUnlocked(i)) return i;
   return Math.min(G.pUnlocked, PUZZLES.length - 1);
@@ -3497,24 +3617,13 @@ function renderPuzzleGrid(){
   let html = '';
   PUZZLES.forEach((p, i) => {
     const cls = ['lv'];
-    const open = isUnlocked(i);
     if(G.pSolved.has(i)) cls.push('solved');
-    if(!open) cls.push('locked');
     if(i === G.pIdx) cls.push('cur');
-    const title = open ? `Puzzle ${i + 1} · ${p.tag}` : `Locked — solve puzzle ${G.pUnlocked + 1} to open the next one`;
-    html += `<button class="${cls.join(' ')}" data-p="${i}" title="${title}"><span>${i + 1}</span></button>`;
+    html += `<button class="${cls.join(' ')}" data-p="${i}" title="Puzzle ${i + 1} · ${p.tag}"><span>${i + 1}</span></button>`;
   });
   const grid = $('pGrid');
   grid.innerHTML = html;
-  grid.querySelectorAll('.lv').forEach(b => b.onclick = () => {
-    const i = +b.dataset.p;
-    if(!isUnlocked(i)){
-      Snd.wrong();
-      toast(`Puzzle ${i + 1} is locked. Solve puzzle ${G.pUnlocked + 1} first.`);
-      return;
-    }
-    loadPuzzle(i);
-  });
+  grid.querySelectorAll('.lv').forEach(b => b.onclick = () => loadPuzzle(+b.dataset.p));
   const cur = grid.querySelector('.lv.cur');
   if(cur) cur.scrollIntoView({ block:'nearest' });
 }
@@ -3553,7 +3662,6 @@ $('pRetry').onclick = () => loadPuzzle(G.pIdx);
 $('pNext').onclick  = () => {
   const n = G.pIdx + 1;
   if(n >= PUZZLES.length){ toast('That is the last puzzle.'); return; }
-  if(!isUnlocked(n)){ Snd.wrong(); toast(`Puzzle ${n + 1} is locked. Solve this one first.`); return; }
   loadPuzzle(n);
 };
 $('pPrev').onclick  = () => { if(G.pIdx > 0) loadPuzzle(G.pIdx - 1); };
@@ -3664,7 +3772,7 @@ function loadLesson(i){
 function startStep(){
   const L = LESSONS[G.lIdx], st = L.steps[G.lStep];
   G.s = parseFEN(st.fen);
-  G.hist = []; G.sanList = []; G.keys = [posKey(G.s)];
+  G.hist = []; G.sanList = []; G.keys = [repetitionKey(G.s)];
   G.sel = -1; G.targets = []; G.lastMove = null; G.anim = null;
   G.over = false; G.busy = false; G.lWaiting = false; G.hintSq = null;
   G.orient = G.s.turn;
