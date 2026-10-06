@@ -3488,6 +3488,11 @@ document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
 });
 
 /* --- puzzles ----------------------------------------------------------- */
+function puzzleInstruction(p, turn){
+  const side = turn === 'w' ? 'White' : 'Black';
+  const goal = p.goal || (isMateTag(p.tag) ? 'Finish it.' : 'Find the strongest move.');
+  return `${side} to move. ${goal}`;
+}
 function loadPuzzle(i){
   clearTimers();
   G.pIdx = (i + PUZZLES.length) % PUZZLES.length;
@@ -3502,6 +3507,10 @@ function loadPuzzle(i){
   $('pHintBox').hidden = true;
   $('pHint').textContent = 'Show hint';
   render(); updatePuzzleUI();
+  // Read only the visible instruction, never the hint or solution.
+  // Stop the previous puzzle/lesson so rapid navigation cannot queue old guidance.
+  Coach.stop();
+  Coach.say(puzzleInstruction(p, G.s.turn));
 }
 
 function uci(m){ return toAlg(m.f) + toAlg(m.t) + (m.pr || ''); }
@@ -3667,9 +3676,8 @@ function updatePuzzleUI(){
   const p = PUZZLES[G.pIdx];
   $('pTag').textContent = p.tag;
   const side = G.s.turn === 'w' ? 'White' : 'Black';
-  const goal = p.goal || (isMateTag(p.tag) ? 'Finish it.' : 'Find the strongest move.');
   $('pMeta').innerHTML = `<b>Puzzle ${G.pIdx + 1} of ${PUZZLES.length}</b> · ${bandOf(G.pIdx)}<br>` +
-    (G.over ? 'Solved — the line is on the board.' : `${side} to move. ${goal}`);
+    (G.over ? 'Solved — the line is on the board.' : puzzleInstruction(p, G.s.turn));
   $('pProgress').textContent = `solved ${G.pSolved.size} of ${PUZZLES.length}`;
   $('pBand').textContent = `All ${PUZZLES.length} unlocked`;
   $('pJump').max = PUZZLES.length;
