@@ -481,6 +481,22 @@ button.who:hover{border-color:var(--ac);opacity:1}
   .tabs button.on:hover{opacity:1}
 }
 </style>
+<style>
+/* A calmer, touch-friendly shell without changing saved board themes. */
+.card{border-radius:16px;padding:16px;background:color-mix(in srgb,var(--pn) 96%,var(--ac));box-shadow:0 8px 24px #00000018}
+.tabs{border-radius:16px;padding:5px}.tabs button{border-radius:11px;min-height:42px}
+.btn{border-radius:11px;min-height:42px}.btn.pri{background:var(--ac);color:var(--bg);font-weight:700}
+button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid var(--ac);outline-offset:3px}
+#playPanel,#puzzlePanel,#learnPanel{order:1}#profileCard{order:8}#lookCard{order:9}
+.welcome{font-size:13px;line-height:1.6;margin:0 0 16px;opacity:.8;max-width:65ch}
+.board-help{font-size:12px;line-height:1.5;opacity:.65;margin:8px 2px}
+details>summary{cursor:pointer;font-size:14px;font-weight:650;padding:4px 0;min-height:32px}
+details[open]>summary{margin-bottom:12px}
+.levelGrid{grid-template-columns:repeat(auto-fill,minmax(42px,1fr));gap:7px;max-height:260px}
+.lv{font-size:12px;min-height:42px;border-radius:10px}.lv.cur{outline:2px solid var(--ac);outline-offset:1px}
+.status{padding:12px 14px;background:var(--pn);border-radius:12px;line-height:1.5}
+@media(max-width:760px){.welcome{font-size:12px;margin-bottom:10px}.card{padding:14px}.board-help{font-size:11px}.levelGrid{grid-template-columns:repeat(auto-fill,minmax(42px,1fr))}}
+</style>
 </head>
 <body>
 <div class="wrap">
@@ -496,16 +512,18 @@ button.who:hover{border-color:var(--ac);opacity:1}
       <button class="btn" id="themeBtn">Shuffle theme</button>
       <button class="btn on" id="soundBtn">Sound on</button>
       <button class="btn on" id="voiceBtn">Coach voice on</button>
-      <label class="volWrap" title="Volume">🔈<input type="range" id="vol" min="0" max="100" value="90"><span id="volNum">90</span></label>
+      <label class="volWrap" title="Volume">🔈<input aria-label="Sound and coach volume" type="range" id="vol" min="0" max="100" value="55"><span id="volNum">55</span></label>
     </div>
   </header>
+  <p class="welcome">A little chess, at your pace. Play a friendly bot, explore any puzzle, or learn one idea at a time.</p>
 
   <main>
     <section class="boardArea">
       <div class="tray" id="trayTop"></div>
       <div class="boardBox"><div class="board" id="board"></div><div id="badgeLayer"></div></div>
       <div class="tray" id="trayBottom"></div>
-      <div class="status" id="status"></div>
+      <p class="board-help">Tap a piece, then a highlighted square. You can also drag it. No rush.</p>
+      <div class="status" id="status" role="status" aria-live="polite"></div>
       <div id="resultBanner"></div>
       <div id="browseBar" hidden style="margin-top:8px">
         <button class="btn mini" id="backLive">← Back to the game</button>
@@ -529,7 +547,7 @@ button.who:hover{border-color:var(--ac);opacity:1}
 
       <!-- APPEARANCE (always visible, saved per player) -->
       <div class="card" id="lookCard">
-        <h3>Appearance</h3>
+        <details><summary>Make it yours · looks &amp; audio</summary>
         <div class="look">
           <label>Board<select id="boardSel"></select></label>
           <label>Background<select id="backSel"></select></label>
@@ -539,18 +557,21 @@ button.who:hover{border-color:var(--ac);opacity:1}
         </div>
         <div id="voiceNote2" style="font-size:11px;opacity:.5;margin-top:6px"></div>
         <div class="row" style="margin-top:9px">
+          <button class="btn mini" id="voicePreview">Try coach voice</button>
           <button class="btn mini" id="lookRandom">Surprise me</button>
           <button class="btn mini" id="lookReset">Reset</button>
         </div>
         <div style="font-size:11px;opacity:.5;margin-top:7px">
           Saved automatically as <b id="lookWho">guest</b>'s default, along with the coach voice.
         </div>
+        </details>
       </div>
 
       <!-- PLAY -->
       <div id="playPanel">
         <div class="card">
           <h3>Bot strength</h3>
+          <details><summary>Choose your opponent</summary>
           <div class="col" id="levels">
             <button class="btn wide lvl" data-lvl="0"><b>300 · Basic</b><span>Just about knows the rules. Hangs pieces, misses most mates</span></button>
             <button class="btn wide lvl" data-lvl="1"><b>400 · Novice</b><span>Grabs what it sees, blunders back straight away</span></button>
@@ -559,6 +580,7 @@ button.who:hover{border-color:var(--ac);opacity:1}
             <button class="btn wide lvl" data-lvl="4"><b>2000 · No blunders</b><span>Deep search, checked twice before it moves</span></button>
             <button class="btn wide lvl" data-lvl="5"><b>3000 · Full strength</b><span>The hardest I can build. Thinks for a few seconds</span></button>
           </div>
+          </details>
         </div>
         <div class="card">
           <h3>Game</h3>
@@ -608,7 +630,13 @@ button.who:hover{border-color:var(--ac);opacity:1}
           <div class="hintbox" id="pHintBox" hidden></div>
         </div>
         <div class="card">
-          <h3>Levels</h3>
+          <h3>Explore all puzzles</h3>
+          <div class="row" style="margin-bottom:12px">
+            <label for="pJump">Puzzle</label>
+            <input id="pJump" type="number" min="1" max="123" value="1" style="width:76px;padding:10px;border-radius:9px">
+            <button class="btn" id="pJumpGo">Go</button>
+            <button class="btn" id="pUnsolved">Try an unsolved one</button>
+          </div>
           <div class="row" style="margin-bottom:10px">
             <button class="btn" id="pPrev">← Previous</button>
             <button class="btn" id="pNext">Next →</button>
@@ -660,8 +688,8 @@ button.who:hover{border-color:var(--ac);opacity:1}
       <a href="https://ferdousnishan.com" target="_blank" rel="noopener noreferrer"
          style="color:var(--ac);text-decoration:none;border-bottom:1px solid color-mix(in srgb, var(--ac) 45%, transparent)">ferdousnishan.com</a>
     </div>
-    Single file, no dependencies. Sounds are synthesised live with the Web Audio API — the wood knock is a filtered
-    noise transient over three decaying body tones; check is a detuned low cluster under a closing filter. The coach
+    Play at your own pace. All 123 puzzles are open, and your progress stays in this browser. Sounds are optional;
+    try Velvet Wood for soft moves and a little cinematic tension. The coach
     speaks through your browser's own speech synthesis, so it works offline. 123 puzzles, every one machine-verified.
   </div>
 </div>
@@ -710,9 +738,11 @@ const Snd = (() => {
     { n:'Sharp Tap', hp:1150, bright:3.9, decay:.020, click:1.25, checkHz:98, checkBright:2.3,
       body:[[280,.4,.026]] },
     { n:'Soft Felt', hp:150, bright:.85, decay:.078, click:.2, checkHz:49, checkBright:.7,
-      body:[[120,.9,.115],[190,.4,.08]] }
+      body:[[120,.9,.115],[190,.4,.08]] },
+    { n:'Velvet Wood · calm & cinematic', hp:180, bright:1.1, decay:.065, click:.28, checkHz:110, checkBright:.8,
+      body:[[174,.65,.10],[349,.28,.075],[523,.12,.06]] }
   ];
-  let setIdx = 0;
+  let setIdx = 5;
   const kit = () => SOUNDSETS[setIdx] || SOUNDSETS[0];
 
   /* the strike: a click transient, a filtered noise burst, then body resonance */
@@ -766,7 +796,7 @@ const Snd = (() => {
     o.connect(g); g.connect(master); o.start(t); o.stop(t+dur+.03);
   }
 
-  let volume = 0.9;
+  let volume = 0.55;
   const api = {
     setEnabled(v){ enabled = v; if(v) boot(); },
     isEnabled(){ return enabled; },
@@ -805,10 +835,10 @@ const Snd = (() => {
       thock(t, {gain:.5, pitch:1.4, bright:1.6});          // a sharp rap so the warning cuts through
       const lp = c.createBiquadFilter(); lp.type='lowpass'; lp.Q.value = 5.5;
       lp.frequency.setValueAtTime(1200 * k.checkBright, t);
-      lp.frequency.exponentialRampToValueAtTime(210 * k.checkBright, t+.72);
+      lp.frequency.exponentialRampToValueAtTime(210 * k.checkBright, t+.45);
       const g = c.createGain();
       g.gain.setValueAtTime(.0001, t);
-      g.gain.linearRampToValueAtTime(.30, t+.035);
+      g.gain.linearRampToValueAtTime(.13, t+.035);
       g.gain.exponentialRampToValueAtTime(.0006, t+1.15);
       lp.connect(g); g.connect(master);
       // tremolo for a growl
@@ -816,7 +846,7 @@ const Snd = (() => {
       lfo.frequency.value = 7.5; lg.gain.value = .10;
       lfo.connect(lg); lg.connect(g.gain); lfo.start(t); lfo.stop(t+1.2);
       const base = k.checkHz;
-      [[base,'sawtooth',.5],[base*1.06,'sawtooth',.44],[base*2,'triangle',.26],[base*2.83,'sine',.14]]
+      [[base,'triangle',.5],[base*1.5,'sine',.25],[base*2,'triangle',.20],[base*3,'sine',.10]]
       .forEach(([f,type,a])=>{
         const o = c.createOscillator(); o.type = type; o.frequency.value = f;
         const og = c.createGain(); og.gain.value = a;
@@ -856,7 +886,7 @@ const Snd = (() => {
       g.gain.setValueAtTime(.0001,t); g.gain.linearRampToValueAtTime(.26,t+.006);
       g.gain.exponentialRampToValueAtTime(.0005,t+.15);
       s.connect(lp); lp.connect(g); g.connect(master); s.start(t); s.stop(t+.2);
-      tone(t, 98, .18, {type:'square', gain:.07, to:72});
+      tone(t, 220, .18, {type:'sine', gain:.045, to:196});
     },
 
     pick(){
@@ -891,7 +921,7 @@ const Coach = (() => {
      and Magnus uses those instead of the synthesiser; anything missing falls
      back to speech synthesis, so a half-finished set still works. */
   const VOICE_DIR = 'voice/';
-  let clip = null, useClips = true, vol = 0.9;   // one volume for speech and clips alike
+  let clip = null, useClips = true, vol = 0.55;   // one volume for speech and clips alike
   function stopClip(){
     if(clip){ try { clip.pause(); clip.src = ''; } catch(e){} clip = null; }
   }
@@ -1075,14 +1105,15 @@ const Coach = (() => {
         const clean = String(text)
           .replace(/—/g, ', ')
           .replace(/\bO-O-O\b/g, 'castling long')
-          .replace(/\bO-O\b/g, 'castling short');
+          .replace(/\bO-O\b/g, 'castling short')
+          .replace(/\b([a-h])([1-8])\b/gi, '$1 $2');
         const parts = clean.split(/(?<=[.!?])\s+/).filter(s => s.trim().length);
         parts.forEach((part, i) => {
           const u = new SpeechSynthesisUtterance(part.trim());
           if(voice) u.voice = voice;
           // a touch under normal speed, and a hair of variation between sentences
-          u.rate = (opts && opts.rate) || (0.94 + (i % 2) * 0.03);
-          u.pitch = (opts && opts.pitch) || (0.98 + (i % 3) * 0.02);
+          u.rate = (opts && opts.rate) || 1;
+          u.pitch = (opts && opts.pitch) || 1;
           u.volume = vol;
           synth.speak(u);
         });
@@ -3601,9 +3632,9 @@ function finishPuzzle(){
   const next = G.pIdx + 1;
   const more = next < PUZZLES.length;
   $('status').innerHTML = `<span class="tag">Solved</span> That is the idea. ` +
-    (more ? `Puzzle ${next + 1} is unlocked.` : 'That was the last one — nice.');
+    (more ? `Take a moment, then try puzzle ${next + 1} whenever you're ready.` : 'That was the last one — nice.');
   // move on by itself, so you are never handed the same puzzle twice in a row
-  if(more) later(() => { if(G.mode === 'puzzle' && G.over && isUnlocked(next)) loadPuzzle(next); }, 1900);
+  // Let the player study the solved position before choosing the next puzzle.
 }
 
 /* Every puzzle is open from the start — they are simply ordered easiest first,
@@ -3619,13 +3650,13 @@ function renderPuzzleGrid(){
     const cls = ['lv'];
     if(G.pSolved.has(i)) cls.push('solved');
     if(i === G.pIdx) cls.push('cur');
-    html += `<button class="${cls.join(' ')}" data-p="${i}" title="Puzzle ${i + 1} · ${p.tag}"><span>${i + 1}</span></button>`;
+    html += `<button class="${cls.join(' ')}" data-p="${i}" aria-label="Puzzle ${i + 1}, ${p.tag}${G.pSolved.has(i) ? ', solved' : ''}" aria-current="${i === G.pIdx ? 'true' : 'false'}" title="Puzzle ${i + 1} · ${p.tag}"><span>${i + 1}</span></button>`;
   });
   const grid = $('pGrid');
   grid.innerHTML = html;
   grid.querySelectorAll('.lv').forEach(b => b.onclick = () => loadPuzzle(+b.dataset.p));
   const cur = grid.querySelector('.lv.cur');
-  if(cur) cur.scrollIntoView({ block:'nearest' });
+  if(cur) grid.scrollTop = Math.max(0, cur.offsetTop - grid.offsetTop - grid.clientHeight / 2);
 }
 function bandOf(i){
   const f = i / PUZZLES.length;
@@ -3640,7 +3671,11 @@ function updatePuzzleUI(){
   $('pMeta').innerHTML = `<b>Puzzle ${G.pIdx + 1} of ${PUZZLES.length}</b> · ${bandOf(G.pIdx)}<br>` +
     (G.over ? 'Solved — the line is on the board.' : `${side} to move. ${goal}`);
   $('pProgress').textContent = `solved ${G.pSolved.size} of ${PUZZLES.length}`;
-  $('pBand').textContent = `unlocked ${Math.min(G.pUnlocked + 1, PUZZLES.length)}`;
+  $('pBand').textContent = `All ${PUZZLES.length} unlocked`;
+  $('pJump').max = PUZZLES.length;
+  $('pJump').value = G.pIdx + 1;
+  $('pPrev').disabled = G.pIdx === 0;
+  $('pNext').disabled = G.pIdx === PUZZLES.length - 1;
   renderPuzzleGrid();
   if(!G.over && !G.busy){
     const chk = inCheck(G.s, G.s.turn);
@@ -3659,6 +3694,17 @@ $('pHint').onclick = () => {
   if(box.hidden) Coach.stop(); else Coach.line(VID.hint(G.pIdx), PUZZLES[G.pIdx].hint);
 };
 $('pRetry').onclick = () => loadPuzzle(G.pIdx);
+$('pJumpGo').onclick = () => {
+  const number = Number($('pJump').value);
+  if(!Number.isInteger(number) || number < 1 || number > PUZZLES.length){ toast(`Choose a puzzle from 1 to ${PUZZLES.length}.`); return; }
+  loadPuzzle(number - 1);
+};
+$('pJump').addEventListener('keydown', e => { if(e.key === 'Enter') $('pJumpGo').click(); });
+$('pUnsolved').onclick = () => loadPuzzle(firstUnsolved());
+$('voicePreview').onclick = () => {
+  if(!Coach.isOn()){ toast('Turn on coach voice first, then try it here.'); return; }
+  Coach.say("Hey, welcome. Take your time. Tap a piece, explore a move, and we'll learn together.");
+};
 $('pNext').onclick  = () => {
   const n = G.pIdx + 1;
   if(n >= PUZZLES.length){ toast('That is the last puzzle.'); return; }
