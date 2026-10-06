@@ -493,6 +493,14 @@ button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visi
 details>summary{cursor:pointer;font-size:14px;font-weight:650;padding:4px 0;min-height:32px}
 details[open]>summary{margin-bottom:12px}
 .levelGrid{grid-template-columns:repeat(auto-fill,minmax(42px,1fr));gap:7px;max-height:260px}
+#toolsToggle{display:inline-flex;align-items:center}
+.tools{display:none;flex-basis:100%;justify-content:flex-end}.tools.open{display:flex}
+.welcome{display:none}.board-help{margin:8px 2px;font-size:11px}
+#playPanel,#puzzlePanel,#learnPanel{display:flex;flex-direction:column;gap:12px}
+#playPanel[hidden],#puzzlePanel[hidden],#learnPanel[hidden]{display:none}
+#coachBtn span,#coachNote{display:none}
+.btn:disabled{opacity:.4;cursor:default;transform:none;box-shadow:none}
+.compact-note{font-size:11px;opacity:.6;line-height:1.5}
 .lv{font-size:12px;min-height:42px;border-radius:10px}.lv.cur{outline:2px solid var(--ac);outline-offset:1px}
 .status{padding:12px 14px;background:var(--pn);border-radius:12px;line-height:1.5}
 @media(max-width:760px){.welcome{font-size:12px;margin-bottom:10px}.card{padding:14px}.board-help{font-size:11px}.levelGrid{grid-template-columns:repeat(auto-fill,minmax(42px,1fr))}}
@@ -503,7 +511,7 @@ details[open]>summary{margin-bottom:12px}
   <header>
     <h1><span class="mark">♞</span> Wood &amp; Bone <small id="themeName">Ink &amp; Paper</small></h1>
     <div class="tabs">
-      <button data-mode="play" class="on">Play a bot</button>
+      <button data-mode="play" class="on">Play</button>
       <button data-mode="puzzle">Puzzles</button>
       <button data-mode="learn">Learn</button>
     </div>
@@ -522,7 +530,7 @@ details[open]>summary{margin-bottom:12px}
       <div class="tray" id="trayTop"></div>
       <div class="boardBox"><div class="board" id="board"></div><div id="badgeLayer"></div></div>
       <div class="tray" id="trayBottom"></div>
-      <p class="board-help">Tap a piece, then a highlighted square. You can also drag it. No rush.</p>
+      <p class="board-help">Tap or drag a piece. Make your move.</p>
       <div class="status" id="status" role="status" aria-live="polite"></div>
       <div id="resultBanner"></div>
       <div id="browseBar" hidden style="margin-top:8px">
@@ -534,7 +542,7 @@ details[open]>summary{margin-bottom:12px}
     <aside class="panel">
       <!-- PROFILE (always visible) -->
       <div class="card" id="profileCard">
-        <h3>Player</h3>
+        <details><summary>Your progress &amp; profile</summary>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <b id="who" style="font-size:15px">guest</b>
           <button class="btn mini" id="whoChange">Change</button>
@@ -543,6 +551,7 @@ details[open]>summary{margin-bottom:12px}
         </div>
         <div id="whoStats" style="font-size:11.5px;opacity:.6;margin-top:6px"></div>
         <div id="whoOthers" style="font-size:11px;opacity:.6;margin-top:6px"></div>
+        </details>
       </div>
 
       <!-- APPEARANCE (always visible, saved per player) -->
@@ -570,7 +579,6 @@ details[open]>summary{margin-bottom:12px}
       <!-- PLAY -->
       <div id="playPanel">
         <div class="card">
-          <h3>Bot strength</h3>
           <details><summary>Choose your opponent</summary>
           <div class="col" id="levels">
             <button class="btn wide lvl" data-lvl="0"><b>300 · Basic</b><span>Just about knows the rules. Hangs pieces, misses most mates</span></button>
@@ -583,12 +591,13 @@ details[open]>summary{margin-bottom:12px}
           </details>
         </div>
         <div class="card">
-          <h3>Game</h3>
+          <details><summary>Choose your side</summary>
           <div class="row" style="margin-bottom:8px">
             <button class="btn mini on" data-side="w">Play white</button>
             <button class="btn mini" data-side="b">Play black</button>
             <button class="btn mini" data-side="r">Random</button>
           </div>
+          </details>
           <div class="row">
             <button class="btn pri" id="newBtn">New game</button>
             <button class="btn" id="undoBtn">Undo</button>
@@ -596,7 +605,6 @@ details[open]>summary{margin-bottom:12px}
           </div>
         </div>
         <div class="card">
-          <h3>Mode</h3>
           <button class="btn wide lvl" id="coachBtn"><b>Learn with bot — off</b>
             <span>Turn on for move grades, arrows and Magnus talking you through it</span></button>
           <div style="font-size:11px;opacity:.5;margin-top:7px" id="coachNote">
@@ -612,8 +620,9 @@ details[open]>summary{margin-bottom:12px}
         </div>
         <div class="card" id="reviewPanel" hidden></div>
         <div class="card">
-          <h3>Your games</h3>
+          <details><summary>Past games</summary>
           <div id="history" class="hist"><span class="empty">No finished games yet.</span></div>
+          </details>
         </div>
       </div>
 
@@ -627,34 +636,35 @@ details[open]>summary{margin-bottom:12px}
             <button class="btn" id="pRetry">Retry</button>
             <button class="btn" id="pSolve">Solution</button>
           </div>
+          <div class="row" style="margin-top:10px">
+            <button class="btn" id="pPrev">←</button>
+            <button class="btn" id="pNext">Next →</button>
+            <button class="btn" id="pShuffle">🎲 Surprise me</button>
+            <button class="btn" id="pFlip">Flip</button>
+          </div>
           <div class="hintbox" id="pHintBox" hidden></div>
         </div>
         <div class="card">
-          <h3>Explore all puzzles</h3>
+          <details><summary>All 123 puzzles · pick any</summary>
           <div class="row" style="margin-bottom:12px">
             <label for="pJump">Puzzle</label>
             <input id="pJump" type="number" min="1" max="123" value="1" style="width:76px;padding:10px;border-radius:9px">
             <button class="btn" id="pJumpGo">Go</button>
             <button class="btn" id="pUnsolved">Try an unsolved one</button>
           </div>
-          <div class="row" style="margin-bottom:10px">
-            <button class="btn" id="pPrev">← Previous</button>
-            <button class="btn" id="pNext">Next →</button>
-            <button class="btn" id="pFlip">Flip</button>
-          </div>
           <div class="levelGrid" id="pGrid"></div>
           <div class="mat" style="margin-top:8px"><span id="pProgress"></span><span id="pBand"></span></div>
           <div style="font-size:11px;opacity:.5;margin-top:6px;line-height:1.5">
-            All 123 are open — they run easiest first, so going in order gets steadily harder.
-            Green means solved.
+            Easiest first. Green means solved.
           </div>
+          </details>
         </div>
         <div class="card">
-          <h3>How it works</h3>
+          <details><summary>Need a hand?</summary>
           <div style="font-size:12.5px;line-height:1.65;opacity:.72">
-            Each puzzle has one winning idea, and they get harder as you go. Play the move on the board — a wrong
-            try is taken back so you can keep looking. Press Hint and the coach says it out loud.
+            Find the winning move. Wrong tries are taken back. Tap Hint for a nudge.
           </div>
+          </details>
         </div>
       </div>
 
@@ -669,14 +679,15 @@ details[open]>summary{margin-bottom:12px}
             <button class="btn mini" id="cAgain">Say again</button>
             <button class="btn mini" id="cShow">Show me</button>
             <button class="btn mini" id="cRestart">Restart lesson</button>
-            <button class="btn mini" id="cExport" title="Save every line he speaks, ready for generating audio">Export script</button>
+            <button class="btn mini" id="cExport" hidden title="Save every line he speaks, ready for generating audio">Export script</button>
           </div>
           <div class="pmeta" id="lessonMeta" style="margin:10px 0 0"></div>
           <div id="voiceNote" class="hintbox" style="display:none;font-size:11.5px"></div>
         </div>
         <div class="card">
-          <h3>Lessons</h3>
+          <details><summary>Choose a lesson</summary>
           <div id="lessonList"></div>
+          </details>
         </div>
       </div>
     </aside>
@@ -688,9 +699,6 @@ details[open]>summary{margin-bottom:12px}
       <a href="https://ferdousnishan.com" target="_blank" rel="noopener noreferrer"
          style="color:var(--ac);text-decoration:none;border-bottom:1px solid color-mix(in srgb, var(--ac) 45%, transparent)">ferdousnishan.com</a>
     </div>
-    Play at your own pace. All 123 puzzles are open, and your progress stays in this browser. Sounds are optional;
-    try Velvet Wood for soft moves and a little cinematic tension. The coach
-    speaks through your browser's own speech synthesis, so it works offline. 123 puzzles, every one machine-verified.
   </div>
 </div>
 
@@ -3709,6 +3717,11 @@ $('pJumpGo').onclick = () => {
 };
 $('pJump').addEventListener('keydown', e => { if(e.key === 'Enter') $('pJumpGo').click(); });
 $('pUnsolved').onclick = () => loadPuzzle(firstUnsolved());
+$('pPrev').setAttribute('aria-label', 'Previous puzzle');
+$('pShuffle').onclick = () => {
+  const choices = PUZZLES.map((_, i) => i).filter(i => i !== G.pIdx);
+  loadPuzzle(choices[Math.floor(Math.random() * choices.length)]);
+};
 $('voicePreview').onclick = () => {
   if(!Coach.isOn()){ toast('Turn on coach voice first, then try it here.'); return; }
   Coach.say("Hey, welcome. Take your time. Tap a piece, explore a move, and we'll learn together.");
