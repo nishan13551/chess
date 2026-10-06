@@ -587,6 +587,7 @@ details[open]>summary{margin-bottom:12px}
             <button class="btn wide lvl on" data-lvl="3"><b>1200 · Really good</b><span>Three moves deep, rarely gives anything away</span></button>
             <button class="btn wide lvl" data-lvl="4"><b>2000 · No blunders</b><span>Deep search, checked twice before it moves</span></button>
             <button class="btn wide lvl" data-lvl="5"><b>3000 · Full strength</b><span>The hardest I can build. Thinks for a few seconds</span></button>
+            <button class="btn wide lvl" data-lvl="6"><b>9999 · Stockfish Boss</b><span>Stockfish 19, full strength. 9999 is a fun label, not a measured rating. First load is about 99 MB.</span></button>
           </div>
           </details>
         </div>
@@ -694,6 +695,11 @@ details[open]>summary{margin-bottom:12px}
   </main>
 
   <div class="foot">
+    <details><summary>Credits &amp; engine license</summary>
+      Puzzles: <a href="https://database.lichess.org/">Lichess open database (CC0)</a>.
+      Boss: Stockfish 19 · <a href="engine/Copying.txt">GPLv3 license</a> ·
+      <a href="https://github.com/nmrugg/stockfish.js/archive/refs/tags/v19.0.0.zip">Corresponding source</a>.
+    </details>
     <div style="font-size:12.5px;opacity:.85;margin-bottom:6px">
       © <span id="yr">2026</span> <b>Built by Ferdous Nishan</b> —
       <a href="https://ferdousnishan.com" target="_blank" rel="noopener noreferrer"
@@ -710,6 +716,8 @@ details[open]>summary{margin-bottom:12px}
 </div>
 <div class="toast" id="toast"></div>
 
+<script src="puzzles.js?v=1"></script>
+<script src="stockfish-bot.js?v=1"></script>
 <script>
 /* ==========================================================================
    1. SOUND — everything synthesised, no audio files
@@ -1761,7 +1769,8 @@ const LEVELS = [
   /* 850ms keeps this one inside the one-second reply window */
   { elo:2000, name:'2000 · No blunders', depth:6, ms:900,  noise:0,   blunder:0,   seesMate:1,   quiet:false, verify:true },
   /* the boss: thinks for as long as it needs. The page stays responsive while it does. */
-  { elo:3000, name:'3000 · Full strength', depth:14, ms:4200, noise:0, blunder:0,  seesMate:1,   quiet:false, verify:true }
+  { elo:3000, name:'3000 · Full strength', depth:14, ms:4200, noise:0, blunder:0,  seesMate:1,   quiet:false, verify:true },
+  { elo:9999, name:'9999 · Stockfish Boss', external:true, ms:2400, delay:3000 }
 ];
 
 /* The search hands control back to the browser every so often, so a long think
@@ -1857,136 +1866,21 @@ async function pickBotMove(s, cfg){
 }
 
 /* ==========================================================================
-   4. PUZZLES — 123 of them, ordered easiest to hardest.
-   Every position was machine-verified: legal, the line is legal, each mate is
-   a proven forced mate, and each material win holds against every defence.
-   line = alternating plies, starting with yours.
+   4. PUZZLES — 123 CC0 Lichess positions, strictly increasing puzzle rating.
+   Ratings estimate player difficulty, not a guarantee of individual perception.
+   The source's first move sets up the tactic; line starts with the player's reply.
    ========================================================================== */
-const PUZZLES = [
-  {fen:"k7/8/8/8/n7/qN6/P7/1K6 b - - 0 1",line:["a3b2"],tag:"Mate in 1",hint:"Mate in one. Your queen has a check the king cannot answer."},
-  {fen:"5k2/8/8/7B/5q2/7b/7P/5RK1 b - - 0 1",line:["f4f1"],tag:"Back-rank mate",hint:"The back rank is not properly guarded. Put a heavy piece there and the king has no air."},
-  {fen:"6k1/5ppp/8/8/8/8/8/R6K w - - 0 1",line:["a1a8"],tag:"Back-rank mate",hint:"Nothing guards the eighth rank. Put your rook there and the king has no air."},
-  {fen:"4rr1k/5ppN/8/7R/8/8/8/5K2 w - - 0 1",line:["h7f6"],tag:"Smothered mate",hint:"His own pieces take away every escape square. Only a knight can reach in."},
-  {fen:"7k/8/8/7r/8/7r/5P1P/6RK b - - 0 1",line:["h3h2"],tag:"Mate in 1",hint:"One move finishes it — find the rook check that covers every escape square."},
-  {fen:"k7/8/8/8/5r2/8/PPP5/1nK5 b - - 0 1",line:["f4f1"],tag:"Back-rank mate",hint:"Look at the back rank. The king is shut in behind its own pawns."},
-  {fen:"2k5/8/8/8/8/8/5PPP/3r1nK1 b - - 0 1",line:["f1e3"],tag:"Smothered mate",hint:"The king is boxed in by its own men. Find the square for your knight."},
-  {fen:"1k2b3/1pp5/B7/1Qq5/8/8/8/1K6 w - - 0 1",line:["b5b7"],tag:"Mate in 1",hint:"There is a mate in one here. Count the king's escape squares, then look for the queen."},
-  {fen:"6k1/4Rppp/3pN3/8/8/8/8/5K2 w - - 0 1",line:["e7e8"],tag:"Back-rank mate",hint:"The last rank is bare. Your rook decides it in one move."},
-  {fen:"6k1/8/8/8/7Q/8/4bP1P/4rnK1 b - - 0 1",line:["f1e3"],tag:"Smothered mate",hint:"Nothing can capture a knight that lands beside that king."},
-  {fen:"k3r3/ppp5/QB6/b7/2b5/8/8/K7 w - - 0 1",line:["a6a7"],tag:"Mate in 1",hint:"A single queen move ends the game. Which check takes the last square away?"},
-  {fen:"6kN/6pp/4R2p/8/8/8/8/6K1 w - - 0 1",line:["e6e8"],tag:"Back-rank mate",hint:"The back rank is not properly guarded. Put a heavy piece there and the king has no air."},
-  {fen:"kN1R4/ppp5/rp6/8/8/8/8/7K w - - 0 1",line:["b8d7"],tag:"Smothered mate",hint:"His own pieces are the cage. A knight jumps in and it is over."},
-  {fen:"2k5/8/8/8/6nq/8/5P2/5BK1 b - - 0 1",line:["h4h2"],tag:"Mate in 1",hint:"Mate in one. Your queen has a check the king cannot answer."},
-  {fen:"4q1k1/5ppp/4R3/7N/4p3/8/8/7K w - - 0 1",line:["e6e8"],tag:"Back-rank mate",hint:"His own pawns never moved, and that is the problem. Your rook ends it on the last rank."},
-  {fen:"knN1n3/pp1b4/8/R7/8/8/8/K7 w - - 0 1",line:["c8b6"],tag:"Smothered mate",hint:"His own pieces take away every escape square. Only a knight can reach in."},
-  {fen:"5qk1/6pp/8/6NQ/8/8/8/3K4 w - - 0 1",line:["h5h7"],tag:"Mate in 1",hint:"One move finishes it — find the queen check that covers every escape square."},
-  {fen:"k7/p1p5/Q7/B7/1p6/8/8/3K4 w - - 0 1",line:["a6c8"],tag:"Back-rank mate",hint:"Look at the back rank. The king is shut in behind its own pawns."},
-  {fen:"4r2k/5p1p/6RN/8/5b2/8/8/1K6 w - - 0 1",line:["h6f7"],tag:"Smothered mate",hint:"The king is boxed in by its own men. Find the square for your knight."},
-  {fen:"7k/4Npp1/8/6Rb/8/8/8/6K1 w - - 0 1",line:["g5h5"],tag:"Mate in 1",hint:"There is a mate in one here. Count the king's escape squares, then look for the rook."},
-  {fen:"7k/6pp/4R2R/8/8/8/8/3K4 w - - 0 1",line:["e6e8"],tag:"Back-rank mate",hint:"The last rank is bare. Your rook decides it in one move."},
-  {fen:"7k/8/6QK/8/8/8/8/8 w - - 0 1",line:["g6g7"],tag:"Mate in 1",hint:"Step the queen right next to the king. Your own king defends her there."},
-  {fen:"8/8/7k/8/1prp2PK/8/2Q5/8 b - - 0 1",line:["c4c2"],tag:"Win material",hint:"Something is not properly defended. Take it — but count the trade first."},
-  {fen:"6k1/8/4b2K/5B2/4b3/8/1Q6/8 w - - 0 1",line:["b2g7"],tag:"Mate in 1",hint:"Mate in one. Your queen has a check the king cannot answer."},
-  {fen:"7k/5ppp/7B/8/4R2N/8/8/5K2 w - - 0 1",line:["e4e8"],tag:"Back-rank mate",hint:"The back rank is not properly guarded. Put a heavy piece there and the king has no air."},
-  {fen:"4n3/1P6/1K6/8/3Q4/8/2b2b2/4k3 b - - 0 1",line:["f2d4"],tag:"Fork",hint:"Your bishop can check the king and hit a second piece with the same move."},
-  {fen:"6k1/8/8/8/3b4/Nq6/PPP5/K3B3 b - - 0 1",line:["b3b2"],tag:"Mate in 1",hint:"One move finishes it — find the queen check that covers every escape square."},
-  {fen:"4q2k/4R1pp/8/7n/6Q1/8/8/6K1 w - - 0 1",line:["e7e8"],tag:"Back-rank mate",hint:"His own pawns never moved, and that is the problem. Your rook ends it on the last rank."},
-  {fen:"4b3/8/4K2k/1R5P/1qP5/1B6/8/8 w - - 0 1",line:["b5b4"],tag:"Win material",hint:"Count attackers and defenders on each piece. One of them comes up short."},
-  {fen:"4rr1k/4Bppp/5N2/8/7Q/8/8/6K1 w - - 0 1",line:["h4h7"],tag:"Mate in 1",hint:"There is a mate in one here. Count the king's escape squares, then look for the queen."},
-  {fen:"3Rq1k1/5ppp/8/8/5Q2/8/8/1K6 w - - 0 1",line:["d8e8"],tag:"Back-rank mate",hint:"Look at the back rank. The king is shut in behind its own pawns."},
-  {fen:"5k2/8/8/8/7n/4r3/4Q1PP/7K b - - 0 1",line:["e3e2"],tag:"Win material",hint:"Your rook wins material by force here."},
-  {fen:"r1kNn3/ppp5/3R4/1Q1r4/8/8/8/5K2 w - - 0 1",line:["b5b7"],tag:"Mate in 1",hint:"A single queen move ends the game. Which check takes the last square away?"},
-  {fen:"2k5/8/8/5b1Q/7n/8/4qPPP/7K b - - 0 1",line:["e2f1"],tag:"Back-rank mate",hint:"The last rank is bare. Your queen decides it in one move."},
-  {fen:"8/1K6/8/5k2/4r3/6p1/1n6/4Q3 b - - 0 1",line:["e4e1"],tag:"Win material",hint:"A piece is hanging, or nearly so. Find it."},
-  {fen:"4q2k/7r/5r1N/7Q/8/8/8/3K4 w - - 0 1",line:["h5e8"],tag:"Fork",hint:"One queen move, two targets, one of them the king. He cannot save both."},
-  {fen:"6k1/5p1p/3R4/5b1q/3Q1N2/8/8/6K1 w - - 0 1",line:["d6d8"],tag:"Back-rank mate",hint:"The back rank is not properly guarded. Put a heavy piece there and the king has no air."},
-  {fen:"5k2/8/8/6B1/4q3/4n1Pb/5PP1/6K1 b - - 0 1",line:["e4g2"],tag:"Mate in 1",hint:"Mate in one. Your queen has a check the king cannot answer."},
-  {fen:"7k/6pp/6q1/4N2R/7B/8/8/K7 w - - 0 1",line:["e5g6"],tag:"Fork",hint:"Find the square where your knight touches the king and something valuable."},
-  {fen:"8/8/5k2/8/8/4n1KP/8/1nqQ4 w - - 0 1",line:["d1c1"],tag:"Double attack",hint:"One queen move attacks two pieces at once. They cannot both run."},
-  {fen:"8/4b3/8/3k3P/5K2/8/2Q5/3q4 w - - 0 1",line:["c2d1"],tag:"Fork",hint:"A double attack with the queen. Check first, collect second."},
-  {fen:"6k1/5pp1/3R3n/8/4Q3/8/8/6K1 w - - 0 1",line:["d6d8"],tag:"Back-rank mate",hint:"His own pawns never moved, and that is the problem. Your rook ends it on the last rank."},
-  {fen:"2kr4/pp2R3/8/p2Q4/8/8/8/6K1 w - - 0 1",line:["d5b7"],tag:"Mate in 1",hint:"One move finishes it — find the queen check that covers every escape square."},
-  {fen:"5r1k/5ppp/8/7Q/8/3B4/8/6K1 w - - 0 1",line:["h5h7"],tag:"Mate in 1",hint:"Only the king guards h7, and your bishop is watching that square too."},
-  {fen:"6k1/8/8/7r/8/8/4QPPP/5bKn b - - 0 1",line:["f1e2"],tag:"Win material",hint:"Something is not properly defended. Take it — but count the trade first."},
-  {fen:"5N1k/6pp/7R/7q/8/8/8/4K3 w - - 0 1",line:["h6h5"],tag:"Win material",hint:"Count attackers and defenders on each piece. One of them comes up short."},
-  {fen:"2k5/8/8/q7/8/8/1PP5/nK2Q3 b - - 0 1",line:["a5e1"],tag:"Fork",hint:"Your queen can check the king and hit a second piece with the same move."},
-  {fen:"2B3kr/1pp1Rppp/5p2/3p3P/3P4/8/P1PK1PP1/8 w - - 1 24",line:["e7e8"],tag:"Back-rank mate",hint:"Look at the back rank. The king is shut in behind its own pawns."},
-  {fen:"5rk1/6pp/4N1n1/6B1/3Q4/8/8/7K w - - 0 1",line:["d4g7"],tag:"Mate in 1",hint:"A single queen move ends the game. Which check takes the last square away?"},
-  {fen:"5qkB/5p1N/5R2/8/8/8/8/K7 w - - 0 1",line:["h7f8"],tag:"Win material",hint:"Your knight wins material by force here."},
-  {fen:"6k1/3pBppp/4N3/3Q4/5r2/8/8/K7 w - - 0 1",line:["d5a8"],tag:"Back-rank mate",hint:"The last rank is bare. Your queen decides it in one move."},
-  {fen:"7k/8/8/3qn3/5R2/6r1/5PPP/6K1 b - - 0 1",line:["d5g2"],tag:"Mate in 1",hint:"Mate in one. Your queen has a check the king cannot answer."},
-  {fen:"5rk1/5pp1/7R/7q/3R4/8/8/4K3 w - - 0 1",line:["h6h5"],tag:"Win material",hint:"A piece is hanging, or nearly so. Find it."},
-  {fen:"7k/5p1p/5q1p/5BQ1/8/8/8/1K6 w - - 0 1",line:["g5f6"],tag:"Fork",hint:"One queen move, two targets, one of them the king. He cannot save both."},
-  {fen:"1k6/8/8/Nr6/3q4/8/PP1n4/K2RQ3 b - - 0 1",line:["d4b2"],tag:"Mate in 1",hint:"One move finishes it — find the queen check that covers every escape square."},
-  {fen:"2R1K3/8/N2b4/8/3k4/3q1R2/8/8 w - - 0 1",line:["f3d3"],tag:"Fork",hint:"Find the square where your rook touches the king and something valuable."},
-  {fen:"6k1/8/8/2r5/Q2r4/8/1PP5/K7 b - - 0 1",line:["d4a4"],tag:"Fork",hint:"A double attack with the rook. Check first, collect second."},
-  {fen:"5q1k/6p1/5R1n/5Bb1/4N3/8/8/6K1 w - - 0 1",line:["f6f8"],tag:"Fork",hint:"Your rook can check the king and hit a second piece with the same move."},
-  {fen:"7k/8/6K1/8/8/8/8/R7 w - - 0 1",line:["a1a8"],tag:"Back-rank mate",hint:"Your king already covers the escape squares. Just deliver the check."},
-  {fen:"k7/8/8/4Q3/4q2r/7P/6PP/5B1K b - - 0 1",line:["e4e5"],tag:"Win material",hint:"Something is not properly defended. Take it — but count the trade first."},
-  {fen:"4r1kq/3Q1pp1/8/8/4N3/8/8/6K1 w - - 0 1",line:["d7e8"],tag:"Fork",hint:"One queen move, two targets, one of them the king. He cannot save both."},
-  {fen:"5k2/8/8/8/3P4/5r2/PPP1r3/1BK1Q3 b - - 0 1",line:["e2e1"],tag:"Fork",hint:"Find the square where your rook touches the king and something valuable."},
-  {fen:"3Bq1kN/4Qppp/6n1/8/5n2/8/8/3K4 w - - 0 1",line:["e7e8"],tag:"Fork",hint:"A double attack with the queen. Check first, collect second."},
-  {fen:"3k4/8/8/2nB4/8/3r4/1PP5/K2R4 b - - 0 1",line:["d3d1"],tag:"Fork",hint:"Your rook can check the king and hit a second piece with the same move."},
-  {fen:"2k1b3/ppp1b3/5Q2/5q2/5N2/8/8/2K5 w - - 0 1",line:["f6f5"],tag:"Fork",hint:"One queen move, two targets, one of them the king. He cannot save both."},
-  {fen:"2r5/1k1qR3/p1p5/3p4/5p2/NP3N2/P5PK/8 w - - 2 35",line:["e7d7"],tag:"Fork",hint:"Find the square where your rook touches the king and something valuable."},
-  {fen:"k2q4/p1p5/2N5/2rB4/3R4/8/8/5K2 w - - 0 1",line:["c6d8"],tag:"Discovered attack",hint:"Move one piece out of the way and the piece behind it does the damage."},
-  {fen:"5qk1/5p1p/3b2N1/7Q/8/8/8/4K3 w - - 0 1",line:["g6f8"],tag:"Win material",hint:"Count attackers and defenders on each piece. One of them comes up short."},
-  {fen:"8/2R5/8/8/8/2K2R1p/3n1qk1/8 w - - 0 1",line:["f3f2"],tag:"Fork",hint:"A double attack with the rook. Check first, collect second."},
-  {fen:"5rk1/7p/5b1Q/3b4/4N3/8/8/3K4 w - - 0 1",line:["e4f6"],tag:"Fork",hint:"Your knight can check the king and hit a second piece with the same move."},
-  {fen:"6rk/6pp/8/6N1/8/8/8/K7 w - - 0 1",line:["g5f7"],tag:"Smothered mate",hint:"His own rook and pawns block every escape. A knight can jump into the gap."},
-  {fen:"8/r4p2/2B5/8/8/2k5/6KQ/7r b - - 0 1",line:["h1h2"],tag:"Fork",hint:"One rook move, two targets, one of them the king. He cannot save both."},
-  {fen:"2K3R1/4k1q1/8/8/3P4/6B1/3p4/8 w - - 0 1",line:["g8g7"],tag:"Fork",hint:"Find the square where your rook touches the king and something valuable."},
-  {fen:"4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1",line:["e5d6"],tag:"En passant",goal:"Capture that pawn — the chance disappears next move.",hint:"That pawn just ran past yours. There is a special capture for exactly this."},
-  {fen:"r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5Q2/PPPP1PPP/RNB1K1NR w - - 0 1",line:["f3f7"],tag:"Mate in 1",hint:"f7 is defended by the king alone, and your bishop already covers it."},
-  {fen:"r3k2r/ppp2ppp/8/3N4/8/8/PPP2PPP/R3K2R w - - 0 1",line:["d5c7","e8f8","c7a8"],tag:"Fork",hint:"Find the knight jump that checks the king and hits a rook in the same breath."},
-  {fen:"3k4/8/8/7r/6Qr/8/5PPP/7K b - - 0 1",line:["h4h2","h1g1","h2h1"],tag:"Mate in 2",hint:"Start with the forcing move. Every reply runs into mate right after."},
-  {fen:"4bB1k/4NRp1/7n/8/8/8/8/K7 w - - 0 1",line:["e7g6","h8g8","f7g7"],tag:"Mate in 2",hint:"Two moves. Check first — after any answer, the knight or a friend finishes the job."},
-  {fen:"7k/8/8/6Rr/8/7q/6P1/6K1 b - - 0 1",line:["h3e3","g1f1","h5h1"],tag:"Mate in 2",hint:"Force it. Give the check that leaves him almost no reply, then mate."},
-  {fen:"6k1/5p1p/8/6NQ/6q1/8/8/2K5 w - - 0 1",line:["h5f7","g8h8","f7f8"],tag:"Mate in 2",hint:"Mate in two. Your first move must be forcing, or he wriggles out."},
-  {fen:"4k3/p6p/8/1N3q2/8/8/P6P/4K3 w - - 0 1",line:["b5d6","e8e7","d6f5"],tag:"Fork",hint:"One knight leap can attack the king and the queen at once."},
-  {fen:"6k1/8/8/r1B5/r7/8/PPP5/K7 b - - 0 1",line:["a4a2","a1b1","a2a1"],tag:"Mate in 2",hint:"Start with the forcing move. Every reply runs into mate right after."},
-  {fen:"4k3/8/8/4N2q/7B/7n/6PP/7K b - - 0 1",line:["h5d1","h4e1","d1e1"],tag:"Mate in 2",hint:"Two moves. Check first — after any answer, the queen or a friend finishes the job."},
-  {fen:"7k/5ppp/7R/7R/7q/8/8/5K2 w - - 0 1",line:["h6h7","h8g8","h7h8"],tag:"Mate in 2",hint:"Force it. Give the check that leaves him almost no reply, then mate."},
-  {fen:"6k1/6p1/6BQ/8/7n/8/8/2K5 w - - 0 1",line:["h6h4","g8f8","h4d8"],tag:"Mate in 2",hint:"Mate in two. Your first move must be forcing, or he wriggles out."},
-  {fen:"5k2/8/8/5r2/8/6n1/5PP1/5RK1 b - - 0 1",line:["g3e2","g1h2","f5h5"],tag:"Mate in 2",hint:"Start with the forcing move. Every reply runs into mate right after."},
-  {fen:"7k/8/8/b7/1r6/1n6/P1P5/1K6 b - - 0 1",line:["b3d2","b1c1","b4b1"],tag:"Mate in 2",hint:"Two moves. Check first — after any answer, the knight or a friend finishes the job."},
-  {fen:"7k/5ppp/7R/7R/8/8/8/K7 w - - 0 1",line:["h6h7","h8g8","h7h8"],tag:"Mate in 2",hint:"Force it. Give the check that leaves him almost no reply, then mate."},
-  {fen:"k2r4/ppp5/Rn6/3R4/8/8/8/3K4 w - - 0 1",line:["d5d8","b6c8","d8c8"],tag:"Mate in 2",hint:"Mate in two. Your first move must be forcing, or he wriggles out."},
-  {fen:"3k4/8/8/8/4n3/4B3/6PP/4rB1K b - - 0 1",line:["e1f1","e3g1","e4f2"],tag:"Mate in 2",hint:"Start with the forcing move. Every reply runs into mate right after."},
-  {fen:"6k1/8/8/8/r2Q4/r7/PPP5/K3B3 b - - 0 1",line:["a3a2","a1b1","a2a1"],tag:"Mate in 2",hint:"Two moves. Check first — after any answer, the rook or a friend finishes the job."},
-  {fen:"5r1k/5ppp/8/4b2R/7R/8/8/1K6 w - - 0 1",line:["h5h7","h8g8","h7h8"],tag:"Mate in 2",hint:"Force it. Give the check that leaves him almost no reply, then mate."},
-  {fen:"k7/pppp4/R7/R7/8/8/8/K7 w - - 0 1",line:["a6a7","a8b8","a7a8"],tag:"Mate in 2",hint:"Mate in two. Your first move must be forcing, or he wriggles out."},
-  {fen:"k7/8/8/3r4/7n/8/4RPPP/6K1 b - - 0 1",line:["d5d1","e2e1","d1e1"],tag:"Mate in 2",hint:"Start with the forcing move. Every reply runs into mate right after."},
-  {fen:"4k3/8/8/7r/8/4B2r/5PPP/7K b - - 0 1",line:["h3h2","h1g1","h2h1"],tag:"Mate in 2",hint:"Two moves. Check first — after any answer, the rook or a friend finishes the job."},
-  {fen:"4k3/8/8/6nq/4P3/8/7P/4Q2K b - - 0 1",line:["h5f3","h1g1","g5h3"],tag:"Mate in 2",hint:"Force it. Give the check that leaves him almost no reply, then mate."},
-  {fen:"2k5/pp6/8/3R4/3R4/8/8/6K1 w - - 0 1",line:["d5c5","c8b8","d4d8"],tag:"Mate in 2",hint:"Mate in two. Your first move must be forcing, or he wriggles out."},
-  {fen:"k7/8/8/6RB/7r/7r/5PPP/7K b - - 0 1",line:["h3h2","h1g1","h2h1"],tag:"Mate in 2",hint:"Start with the forcing move. Every reply runs into mate right after."},
-  {fen:"4k3/8/8/7r/7r/8/5PPP/7K b - - 0 1",line:["h4h2","h1g1","h2h1"],tag:"Mate in 2",hint:"Two moves. Check first — after any answer, the rook or a friend finishes the job."},
-  {fen:"5q1k/5ppp/7R/7R/8/8/8/K7 w - - 0 1",line:["h6h7","h8g8","h7h8"],tag:"Mate in 2",hint:"Force it. Give the check that leaves him almost no reply, then mate."},
-  {fen:"3NQnk1/5p1p/8/6p1/8/8/8/6K1 w - - 0 1",line:["e8f7","g8h8","f7f8"],tag:"Mate in 2",hint:"Mate in two. Your first move must be forcing, or he wriggles out."},
-  {fen:"6k1/8/8/8/6Pb/6Pq/5PPP/6K1 b - - 0 1",line:["h3g4","h2h3","g4d1"],tag:"Sacrifice",hint:"Give material away first. What comes back is worth more — count it to the end."},
-  {fen:"7r/p6p/5k2/8/8/8/P2B3P/1K6 w - - 0 1",line:["d2c3","f6e6","c3h8"],tag:"Discovered attack",hint:"Check along the long diagonal, then look at what stands behind the king."},
-  {fen:"4n2k/5R1p/5N1q/7B/8/8/8/7K w - - 0 1",line:["f7h7","h6h7","f6h7"],tag:"Fork",hint:"One rook move, two targets, one of them the king. He cannot save both."},
-  {fen:"6k1/4B1pp/8/8/3Q1N1r/8/8/5K2 w - - 0 1",line:["d4d5","g8h8","d5a8"],tag:"Mate in 2",hint:"Start with the forcing move. Every reply runs into mate right after."},
-  {fen:"r5k1/5ppp/8/8/8/8/4R3/4R2K w - - 0 1",line:["e2e8","a8e8","e1e8"],tag:"Mate in 2",hint:"Offer one rook so that the other one can land on the back rank."},
-  {fen:"2k5/8/8/8/qr6/QR6/PP6/nK6 b - - 0 1",line:["a1b3","a3a4","b3d2"],tag:"Sacrifice",hint:"Offer the knight, then follow the forced sequence and count again."},
-  {fen:"k7/8/8/7P/6B1/7q/6PP/6Kn b - - 0 1",line:["h3e3","g1h1","e3e1"],tag:"Mating sacrifice",hint:"Give material away first. The recapture is forced and walks into mate."},
-  {fen:"8/2Q5/2p5/6k1/8/3r4/1p2K3/8 b - - 0 1",line:["b2b1q","c7c6","d3d8"],tag:"Promotion",hint:"Push the pawn home, and think about which piece you actually want."},
-  {fen:"6kN/5p1p/8/7Q/8/8/8/7K w - - 0 1",line:["h5f7","g8h8","f7f8"],tag:"Mating sacrifice",hint:"Offer the queen. He cannot refuse, and mate follows."},
-  {fen:"k7/8/8/5B1P/6rb/6r1/5PPP/5N1K b - - 0 1",line:["g3g2","f5g4","g2g4"],tag:"Sacrifice",hint:"The best move loses material at first glance. Look one move further."},
-  {fen:"2k5/8/8/7r/7b/8/5PPr/6K1 b - - 0 1",line:["h2h1","g1h1","h4f2"],tag:"Mating sacrifice",hint:"The winning move hands over material. You are buying escape squares with it."},
-  {fen:"k7/8/8/8/8/q7/PPP5/1nK1N3 b - - 0 1",line:["a3e3","c1b1","e3e1"],tag:"Mating sacrifice",hint:"A gift that cannot be declined. Then the mate is simple."},
-  {fen:"7k/5ppp/7B/7Q/8/8/8/7K w - - 0 1",line:["h5f7","g7h6","f7f8"],tag:"Mating sacrifice",hint:"Give material away first. The recapture is forced and walks into mate."},
-  {fen:"6k1/8/8/r7/b7/1rB5/PPP5/K3B3 b - - 0 1",line:["b3c3","e1c3","a5a8"],tag:"Sacrifice",hint:"Material first, then the point. Follow every forced reply."},
-  {fen:"2k5/8/8/8/qR6/r7/nPPQ4/K7 b - - 0 1",line:["a2c3","b2a3","a4a3"],tag:"Mating sacrifice",hint:"Offer the knight. He cannot refuse, and mate follows."},
-  {fen:"r7/4k3/8/3Q4/Bp3Pp1/4K3/1p5p/8 b - - 0 1",line:["b2b1q","d5b7","e7f6"],tag:"Promotion",hint:"The pawn reaches the end. Usually a queen — make sure it is right here."},
-  {fen:"5k2/8/8/8/q7/b7/PPP5/K7 b - - 0 1",line:["a4c2","b2a3","c2c1"],tag:"Mating sacrifice",hint:"The winning move hands over material. You are buying escape squares with it."},
-  {fen:"7k/8/8/8/B7/q7/P7/Kn1B4 b - - 0 1",line:["b1c3","a4b3","a3c1"],tag:"Mate in 2",hint:"Force it. Give the check that leaves him almost no reply, then mate."},
-  {fen:"6k1/8/8/7q/8/8/5PPP/4rBK1 b - - 0 1",line:["e1f1","g1f1","h5d1"],tag:"Mating sacrifice",hint:"A gift that cannot be declined. Then the mate is simple."},
-  {fen:"5r1k/6pp/7N/3Q4/8/8/8/6K1 w - - 0 1",line:["d5g8","f8g8","h6f7"],tag:"Mating sacrifice",hint:"Give the queen away. The knight delivers the mate in the corner."},
-  {fen:"6k1/8/8/8/8/4r2r/5PPP/5N1K b - - 0 1",line:["e3e1","g2h3","e1f1"],tag:"Sacrifice",hint:"Give material away first. What comes back is worth more — count it to the end."},
-  {fen:"4n1kN/5ppp/3R2Bn/8/8/8/8/1K6 w - - 0 1",line:["d6d8","h7g6","d8e8"],tag:"Sacrifice",hint:"Offer the rook, then follow the forced sequence and count again."}
-];
+const PUZZLES = window.CHESS_PUZZLE_SOURCE.map(row => {
+  const s = parseFEN(row.fen);
+  const setup = legalMoves(s).find(m => uci(m) === row.moves[0]);
+  if(!setup) throw new Error('Invalid puzzle setup: ' + row.id);
+  makeMove(s, setup);
+  const mate = /\bmateIn([1-9])\b/.exec(row.themes);
+  const tag = mate ? 'Mate in ' + mate[1] : 'Tactics';
+  return { id:row.id, fen:toFEN(s), line:row.moves.slice(1), rating:row.rating, tag,
+    goal:mate ? 'Find the checkmate.' : 'Find the strongest move.',
+    hint:mate ? 'Look for forcing checks. Count the king’s escape squares.' : 'Look for checks, captures, and threats. Follow the forcing line.' };
+});
 
 /* ==========================================================================
    3b. OPENING BOOK — used only to label moves as "Book" in the review. The bots
@@ -2767,9 +2661,14 @@ const G = {
 /* Any delayed action goes through later(), so switching tab or restarting can
    cancel it. Otherwise a pending lesson reply fires into a puzzle you moved on to. */
 function later(fn, ms){ const id = setTimeout(fn, ms); G.timers.push(id); return id; }
-function clearTimers(){ G.timers.forEach(clearTimeout); G.timers = []; G.lWaiting = false; G.busy = false; }
+let botEpoch = 0;
+function clearTimers(){
+  botEpoch++;
+  if(window.StockfishBoss) StockfishBoss.cancel();
+  G.timers.forEach(clearTimeout); G.timers = []; G.lWaiting = false; G.busy = false;
+}
 const MATE_TAGS = ['Mate in 1','Mate in 2','Mate in 3','Back-rank mate','Smothered mate','Mating sacrifice'];
-const isMateTag = t => MATE_TAGS.includes(t);
+const isMateTag = t => MATE_TAGS.includes(t) || /^Mate in [1-9]/.test(t);
 
 /* --- board render ------------------------------------------------------- */
 function render(){
@@ -3406,17 +3305,33 @@ function reviewMove(job){
 const BOT_DELAY = 1000;
 function botTurn(){
   if(G.mode !== 'play' || G.over || G.s.turn === G.human) return;
+  const epoch = botEpoch;
   const startedFrom = G.playerMovedAt || performance.now();
   G.busy = true; updateStatus();
   later(async () => {
     const cfg = LEVELS[G.level];
-    const m = await pickBotMove(G.s, cfg);
+    let m;
+    try {
+      if(cfg.external){
+        const code = await StockfishBoss.choose(toFEN(G.s), cfg.ms, G.uciList.slice());
+        if(epoch !== botEpoch) return;
+        m = legalMoves(G.s).find(move => uci(move) === code);
+        if(!m) throw new Error('Engine returned an invalid move');
+      } else m = await pickBotMove(G.s, cfg);
+    } catch(error){
+      if(epoch !== botEpoch) return;
+      G.busy = false;
+      $('status').textContent = 'Boss unavailable. Try New game or choose another opponent.';
+      toast('The engine could not load. No weaker bot was substituted.');
+      return;
+    }
+    if(epoch !== botEpoch) return;
     if(!m){ G.busy = false; updateStatus(); return; }
     if(G.mode !== 'play' || G.over) { G.busy = false; return; }   // you left mid-think
-    const remaining = Math.max(0, BOT_DELAY - (performance.now() - startedFrom));
+    const remaining = Math.max(0, (cfg.delay || BOT_DELAY) - (performance.now() - startedFrom));
     later(() => {
       G.busy = false;
-      if(G.mode !== 'play' || G.over) return;
+      if(G.mode !== 'play' || G.over || epoch !== botEpoch) return;
       const before = clone(G.s);
       const ply = G.sanList.length;
       const prevUci = G.uciList[ply - 1];
@@ -3473,6 +3388,7 @@ document.querySelectorAll('[data-lvl]').forEach(b => b.onclick = () => {
   G.level = +b.dataset.lvl;
   document.querySelectorAll('[data-lvl]').forEach(x => x.classList.toggle('on', x === b));
   save(); toast(`Opponent set to ${LEVELS[G.level].name}`);
+  if(LEVELS[G.level].external) StockfishBoss.prepare().catch(() => toast('Boss download failed. Check your connection and retry.'));
   if(G.mode === 'play') updateStatus();
 });
 document.querySelectorAll('[data-side]').forEach(b => b.onclick = () => {
@@ -3684,7 +3600,7 @@ function updatePuzzleUI(){
   const p = PUZZLES[G.pIdx];
   $('pTag').textContent = p.tag;
   const side = G.s.turn === 'w' ? 'White' : 'Black';
-  $('pMeta').innerHTML = `<b>Puzzle ${G.pIdx + 1} of ${PUZZLES.length}</b> · ${bandOf(G.pIdx)}<br>` +
+  $('pMeta').innerHTML = `<b>Puzzle ${G.pIdx + 1} of ${PUZZLES.length}</b> · ${bandOf(G.pIdx)} · ${p.rating} rating<br>` +
     (G.over ? 'Solved — the line is on the board.' : puzzleInstruction(p, G.s.turn));
   $('pProgress').textContent = `solved ${G.pSolved.size} of ${PUZZLES.length}`;
   $('pBand').textContent = `All ${PUZZLES.length} unlocked`;
@@ -4007,7 +3923,7 @@ function save(){
       // by NAME, not by list position: the voice list loads asynchronously and
       // can come back in a different order, which used to restore the wrong voice
       vn: Coach.currentName(), snd: Snd.getSet(),
-      ps:[...G.pSolved], ld:[...G.lDone], pi:G.pIdx, pu:G.pUnlocked, games:G.games.slice(0, 60),
+      pv:'lichess-rated-v1', ps:[...G.pSolved], ld:[...G.lDone], pi:G.pIdx, pu:G.pUnlocked, games:G.games.slice(0, 60),
       vol: Math.round(Snd.getVolume() * 100)
     }));
   }catch(e){}
@@ -4020,10 +3936,10 @@ function applyProfile(v){
   if(typeof v.bk === 'number' && BACKDROPS[v.bk]) G.backdrop = v.bk;
   if(typeof v.ps2 === 'number' && PIECESETS[v.ps2]) G.pieceSet = v.ps2;
   if(typeof v.l === 'number' && LEVELS[v.l]) G.level = v.l;
-  if(Array.isArray(v.ps)) G.pSolved = new Set(v.ps.filter(i => i < PUZZLES.length));
+  if(v.pv === 'lichess-rated-v1' && Array.isArray(v.ps)) G.pSolved = new Set(v.ps.filter(i => i >= 0 && i < PUZZLES.length));
   if(Array.isArray(v.ld)) G.lDone = new Set(v.ld.filter(i => i < LESSONS.length));
   if(Array.isArray(v.games)) G.games = v.games;
-  if(typeof v.pi === 'number' && v.pi < PUZZLES.length) G.pIdx = v.pi;
+  if(v.pv === 'lichess-rated-v1' && typeof v.pi === 'number' && v.pi >= 0 && v.pi < PUZZLES.length) G.pIdx = v.pi;
   if(typeof v.pu === 'number') G.pUnlocked = Math.max(0, Math.min(v.pu, PUZZLES.length - 1));
   if(v.pu === undefined && G.pSolved.size) G.pUnlocked = Math.min(Math.max(...G.pSolved) + 1, PUZZLES.length - 1);
   if(!isUnlocked(G.pIdx)) G.pIdx = firstUnsolved();
